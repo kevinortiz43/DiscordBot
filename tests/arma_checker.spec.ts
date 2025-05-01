@@ -6,7 +6,7 @@ import * as cheerio from 'cheerio';
 import { parse, isValid } from 'date-fns';
 
 // Configuration
-const HOURS_THRESHOLD = 50;
+const HOURS_THRESHOLD = 100;
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
@@ -108,7 +108,10 @@ for (const { id, name } of workshopMods) {
 
         if (isRecent) {
             console.warn(`⚠️ Recently updated: Mod ${nameOfMod} updated ${ageHours} hours ago`);
-        } 
+        } else {
+            console.log(`✅ No recent update: Mod ${nameOfMod} last updated ${ageHours} hours ago`);
+        }
+
         // Each mod test asserts that it is NOT recent
         expect(isRecent).toBe(false);
 
