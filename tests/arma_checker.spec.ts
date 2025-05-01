@@ -49,7 +49,7 @@ try {
     const files = fs.readdirSync(dataDir);
     const htmlFiles = files.filter(file => path.extname(file).toLowerCase() === '.html');
 
-    console.log(`Found ${htmlFiles.length} HTML files in data directory`);
+    // console.log(`Found ${htmlFiles.length} HTML files in data directory`);
 
     for (const file of htmlFiles) {
         const filePath = path.join(dataDir, file);
@@ -77,7 +77,7 @@ try {
         }
     }
 
-    console.log(`Found ${workshopMods.length} mods across all files`);
+    // console.log(`Found ${workshopMods.length} mods across all files`);
 
 } catch (dirError) {
     console.error(`Error reading data directory: ${dirError.message}`);

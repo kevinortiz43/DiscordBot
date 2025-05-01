@@ -1,27 +1,23 @@
-name: Playwright Tests
+name: Run Playwright Tests
+
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+  schedule:
+    - cron: '0 5/6 * * *' # 5 AM UTC = Midnight ET, then every 6 hours (5 AM, 11 AM, 5 PM, 11 PM UTC)
+  workflow_dispatch: {}  # Manual trigger option
+
 jobs:
-  test:
-    timeout-minutes: 60
+  playwright-docker-tests:
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.28.0-focal  # Optional base image with Playwright already installed
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-      with:
-        node-version: lts/*
-    - name: Install dependencies
-      run: npm ci
-    - name: Install Playwright Browsers
-      run: npx playwright install --with-deps
-    - name: Run Playwright tests
-      run: npx playwright test
-    - uses: actions/upload-artifact@v4
-      if: ${{ !cancelled() }}
-      with:
-        name: playwright-report
-        path: playwright-report/
-        retention-days: 30
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Build Docker Image
+        run: |
+          docker build -t playwright-test .
+
+      - name: Run Playwright Tests
+        run: |
+          docker run --rm playwright-test
