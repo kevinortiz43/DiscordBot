@@ -108,8 +108,6 @@ for (const { id, name } of workshopMods) {
 
         if (isRecent) {
             console.warn(`⚠️ Recently updated: Mod ${nameOfMod} updated ${ageHours} hours ago`);
-        } else {
-            console.log(`✅ No recent update: Mod ${nameOfMod} last updated ${ageHours} hours ago`);
         }
 
         // Each mod test asserts that it is NOT recent
