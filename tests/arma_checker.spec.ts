@@ -6,7 +6,7 @@ import * as cheerio from 'cheerio';
 import { parse, isValid } from 'date-fns';
 
 // Configuration
-const HOURS_THRESHOLD = 100;
+const HOURS_THRESHOLD = 6;
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
