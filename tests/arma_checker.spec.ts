@@ -6,7 +6,7 @@ import * as cheerio from 'cheerio';
 import { parse, isValid } from 'date-fns';
 
 // Configuration
-const HOURS_THRESHOLD = 24;
+
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
@@ -102,7 +102,7 @@ for (const { id, name } of workshopMods) {
         const now = new Date();
         const diffMs = now.getTime() - lastUpdated.getTime();
         const diffHours = diffMs / (1000 * 60 * 60);
-        const isRecent = diffHours < HOURS_THRESHOLD;
+        const isRecent = diffHours < 24;
 
         const ageHours = diffHours.toFixed(1);
 
