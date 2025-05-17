@@ -106,7 +106,7 @@ for (const { id, name } of workshopMods) {
     const now = new Date();
     const diffMs = now.getTime() - lastUpdated.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
-    const isRecent = diffHours < 24;
+    const isRecent = diffHours < 28;
 
     const ageHours = diffHours.toFixed(1);
 
