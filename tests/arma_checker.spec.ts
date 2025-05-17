@@ -7,6 +7,8 @@ import { parse, isValid } from "date-fns";
 
 // Configuration
 
+const Hours_ThresHold = 28+4;
+
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
   let cleaned = rawDateText.trim().replace(/^[A-Za-z]+:\s*/, "");
@@ -106,7 +108,7 @@ for (const { id, name } of workshopMods) {
     const now = new Date();
     const diffMs = now.getTime() - lastUpdated.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
-    const isRecent = diffHours < 28;
+    const isRecent = diffHours < Hours_ThresHold;
 
     const ageHours = diffHours.toFixed(1);
 
