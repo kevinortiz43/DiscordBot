@@ -7,7 +7,7 @@ import { parse, isValid } from "date-fns";
 
 // Configuration
 
-const Hours_ThresHold = 7;
+const Hours_ThresHold = 9;
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
