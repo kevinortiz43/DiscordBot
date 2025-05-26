@@ -110,7 +110,7 @@ for (const { id, name } of workshopMods) {
     const diffHours = diffMs / (1000 * 60 * 60);
     const isRecent = diffHours < Hours_ThresHold+4;
 
-    const ageHours = (diffHours.toFixed(1))-5;
+    const ageHours = (diffHours.toFixed(1))-7;
 
     if (isRecent) {
       console.warn(
