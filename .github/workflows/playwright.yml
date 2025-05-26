@@ -4,8 +4,6 @@ on:
   # Trigger on git push/PR to main/master
   push:
     branches: [main, master]
-  pull_request:
-    branches: [main, master]
   
   # Schedule: Every 6 hours starting at midnight Eastern Time (5 AM UTC)
   schedule:
@@ -32,10 +30,4 @@ jobs:
       - name: Run Playwright Tests
         run: npx playwright test --workers=4
 
-      - name: Upload Test Results (if available)
-        uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 2
+      
