@@ -114,11 +114,11 @@ for (const { id, name } of workshopMods) {
 
     if (isRecent) {
       console.warn(
-        `⚠️ Recently updated: Mod ${nameOfMod} updated ${ageHours} hours ago`
+        `⚠️ Recently updated: Mod ${nameOfMod} updated ${dateLocator} hours ago`
       );
     } else {
       console.warn(
-        `Recently updated: Mod ${nameOfMod} updated ${ageHours} hours ago`
+        `Recently updated: Mod ${nameOfMod} updated ${dateLocator} hours ago`
       );
     }
 
