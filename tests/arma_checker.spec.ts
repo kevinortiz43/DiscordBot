@@ -97,11 +97,13 @@ for (const { id, name } of workshopMods) {
     );
 
     const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
+    const modchangeInfo = page.locator("(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]");
     await dateLocator.waitFor({ timeout: 20000 });
 
     const nameOfMod = await page.locator(".workshopItemTitle").textContent();
     const rawDateText = await dateLocator.textContent();
-
+    const rawInfo = await modchangeInfo.textContent();
+    
     if (!rawDateText) throw new Error("No date text found");
 
     const lastUpdated = parseSteamDate(rawDateText);
@@ -112,7 +114,7 @@ for (const { id, name } of workshopMods) {
 
     if (isRecent) {
       console.warn(
-        `⚠️ Mod ${nameOfMod} updated on ${rawDateText}`
+        `⚠️ Mod ${nameOfMod} updated on ${rawDateText} change: ${rawInfo}`
       );
     } 
     // Each mod test asserts that it is NOT recent
