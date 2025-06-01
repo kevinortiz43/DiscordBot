@@ -102,7 +102,9 @@ for (const { id, name } of workshopMods) {
 
     const nameOfMod = await page.locator(".workshopItemTitle").innerText();
     const rawDateText = await dateLocator.innerText();
-    const rawInfo = await modchangeInfo.textContent();
+    // const rawInfo = await modchangeInfo.textContent();
+    
+    const rawInfo = await modchangeInfo.innerText();
     
     if (!rawDateText) throw new Error("No date text found");
 
@@ -119,7 +121,7 @@ for (const { id, name } of workshopMods) {
         `Mod ${nameOfMod} ${rawDateText} pst ${ageHours} hours ago. `
         
       );
-      console.log('Change: ${rawInfo}');
+      console.log(`Change: ${rawInfo}`);
     } 
     // Each mod test asserts that it is NOT recent
     expect(isRecent).toBe(false);
