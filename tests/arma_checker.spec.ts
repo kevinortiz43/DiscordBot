@@ -7,7 +7,7 @@ import { parse, isValid } from "date-fns";
 
 // Configuration
 
-const Hours_ThresHold = 6;
+const Hours_ThresHold = 7;
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
@@ -109,12 +109,13 @@ for (const { id, name } of workshopMods) {
     const lastUpdated = parseSteamDate(rawDateText);
     const now = new Date();
     const diffMs = now.getTime() - lastUpdated.getTime();
-    const diffHours = diffMs / (1000 * 60 * 60);
+    const diffHours = diffMs / (1000 * 60 * 60) -3;
     const isRecent = diffHours < Hours_ThresHold+4;
-
-    if (!isRecent) {
+    const ageHours = diffHours.toFixed(1);
+    
+    if (isRecent) {
       console.warn(
-        `⚠️ Mod ${nameOfMod} updated on ${rawDateText} change: ${rawInfo}`
+        `Mod ${nameOfMod} ${rawDateText} pst ${ageHours} hours ago. Change: ${rawInfo} `
       );
     } 
     // Each mod test asserts that it is NOT recent
@@ -124,3 +125,5 @@ for (const { id, name } of workshopMods) {
     await new Promise((r) => setTimeout(r, 2000));
   });
 }
+
+
