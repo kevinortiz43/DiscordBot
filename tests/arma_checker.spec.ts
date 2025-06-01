@@ -102,7 +102,7 @@ for (const { id, name } of workshopMods) {
 
     const nameOfMod = await page.locator(".workshopItemTitle").innerText();
     const rawDateText = await dateLocator.innerText();
-    const rawInfo = await modchangeInfo.innerText();
+    const rawInfo = await modchangeInfo.textContent();
     
     if (!rawDateText) throw new Error("No date text found");
 
