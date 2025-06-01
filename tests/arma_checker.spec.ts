@@ -116,8 +116,10 @@ for (const { id, name } of workshopMods) {
     
     if (isRecent) {
       console.warn(
-        `Mod ${nameOfMod} ${rawDateText} pst ${ageHours} hours ago. Change: ${rawInfo} `
+        `Mod ${nameOfMod} ${rawDateText} pst ${ageHours} hours ago. `
+        
       );
+      console.log(Change: ${rawInfo});
     } 
     // Each mod test asserts that it is NOT recent
     expect(isRecent).toBe(false);
