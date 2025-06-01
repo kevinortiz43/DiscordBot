@@ -110,10 +110,10 @@ for (const { id, name } of workshopMods) {
     const now = new Date();
     const diffMs = now.getTime() - lastUpdated.getTime();
     const diffHours = diffMs / (1000 * 60 * 60) ;
-    const isRecent = diffHours < Hours_ThresHold+4;
+    const isRecent = diffHours < Hours_ThresHold;
     const ageHours = diffHours.toFixed(1);
     
-    if (isRecent) {
+    if (!isRecent) {
       console.warn(
         `Mod ${nameOfMod} ${rawDateText} pst ${ageHours} hours ago. Change: ${rawInfo} `
       );
