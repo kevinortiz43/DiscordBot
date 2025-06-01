@@ -109,8 +109,8 @@ for (const { id, name } of workshopMods) {
     const lastUpdated = parseSteamDate(rawDateText);
     const now = new Date();
     const diffMs = now.getTime() - lastUpdated.getTime();
-    const diffHours = diffMs / (1000 * 60 * 60) -3;
-    const isRecent = diffHours < Hours_ThresHold+3;
+    const diffHours = diffMs / (1000 * 60 * 60) ;
+    const isRecent = diffHours < Hours_ThresHold+4;
     const ageHours = diffHours.toFixed(1);
     
     if (isRecent) {
