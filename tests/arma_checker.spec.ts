@@ -110,18 +110,11 @@ for (const { id, name } of workshopMods) {
     const diffHours = diffMs / (1000 * 60 * 60);
     const isRecent = diffHours < Hours_ThresHold+4;
 
-    const ageHours = diffHours.toFixed(1);
-
     if (isRecent) {
       console.warn(
-        `⚠️ Recently updated: Mod ${nameOfMod} updated ${rawDateText} hours ago`
+        `⚠️ Mod ${nameOfMod} updated on ${rawDateText}`
       );
-    } else {
-      console.warn(
-        `Recently updated: Mod ${nameOfMod} updated ${rawDateText} hours ago`
-      );
-    }
-
+    } 
     // Each mod test asserts that it is NOT recent
     expect(isRecent).toBe(false);
 
