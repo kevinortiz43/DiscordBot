@@ -112,7 +112,7 @@ for (const { id, name } of workshopMods) {
     const diffHours = diffMs / (1000 * 60 * 60);
     const isRecent = diffHours < Hours_ThresHold+4;
 
-    if (isRecent) {
+    if (!isRecent) {
       console.warn(
         `⚠️ Mod ${nameOfMod} updated on ${rawDateText} change: ${rawInfo}`
       );
