@@ -100,9 +100,9 @@ for (const { id, name } of workshopMods) {
     const modchangeInfo = page.locator("(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]");
     await dateLocator.waitFor({ timeout: 20000 });
 
-    const nameOfMod = await page.locator(".workshopItemTitle").textContent();
-    const rawDateText = await dateLocator.textContent();
-    const rawInfo = await modchangeInfo.textContent();
+    const nameOfMod = await page.locator(".workshopItemTitle").innerText();
+    const rawDateText = await dateLocator.innerText();
+    const rawInfo = await modchangeInfo.innerText();
     
     if (!rawDateText) throw new Error("No date text found");
 
