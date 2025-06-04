@@ -97,6 +97,8 @@ for (const { id, name } of workshopMods) {
     );
 
     const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
+
+
     const modchangeInfo = page.locator("(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]");
     await dateLocator.waitFor({ timeout: 20000 });
 
@@ -117,11 +119,8 @@ for (const { id, name } of workshopMods) {
     const ageHours = diffHours.toFixed(1);
     
     if (isRecent) {
-      console.warn(
-        `Mod ${nameOfMod} ${rawDateText} pst ${ageHours} hours ago. `
-        
-      );
-      console.log(`Change: ${rawInfo}`);
+      console.warn(`Mod ${nameOfMod} ${rawDateText} pst ${ageHours} hours ago. Change: ${rawInfo} `);
+ 
     } 
     // Each mod test asserts that it is NOT recent
     expect(isRecent).toBe(false);
