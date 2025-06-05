@@ -91,37 +91,54 @@ for (const { id, name } of workshopMods) {
   test(`Mod ${name} - Check recent update`, async ({ page }) => {
     await page.goto(
       `https://steamcommunity.com/sharedfiles/filedetails/changelog/${id}`,
-      {
-        waitUntil: "domcontentloaded",
-      }
+      { waitUntil: "domcontentloaded" }
     );
 
     const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
 
-
-    const modchangeInfo = page.locator("(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]");
+    const modchangeInfo = page.locator(
+      "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
+    );
     await dateLocator.waitFor({ timeout: 20000 });
 
     const nameOfMod = await page.locator(".workshopItemTitle").innerText();
     const rawDateText = await dateLocator.innerText();
     // const rawInfo = await modchangeInfo.textContent();
-    
+
     const rawInfo = await modchangeInfo.innerText();
-    
+
     if (!rawDateText) throw new Error("No date text found");
 
     const lastUpdated = parseSteamDate(rawDateText);
     const now = new Date();
     const diffMs = now.getTime() - lastUpdated.getTime();
-    let diffHours = diffMs / (1000 * 60 * 60) ;
-    const isRecent = diffHours < Hours_ThresHold+6;
-     diffHours-=7; 
+    let diffHours = diffMs / (1000 * 60 * 60);
+    const isRecent = diffHours < Hours_ThresHold + 6;
+    diffHours -= 7;
     const ageHours = diffHours.toFixed(1);
-    
+
     if (isRecent) {
-      console.warn(`Mod ${nameOfMod} ${rawDateText} pst ${ageHours} hours ago. Change: ${rawInfo} `);
- 
-    } 
+      console.warn(
+        // Discord url
+        // https://discord.com/channels/512149091946463245/863524960437927966
+
+        //       test(`Mod ${name} - Check recent update`, async ({ page }) => {
+        // await page.goto(`https://steamcommunity.com/sharedfiles/filedetails/changelog/${id}`,{waitUntil: "domcontentloaded",});
+
+        // const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
+        
+        `Mod ${nameOfMod} ${rawDateText} pst ${ageHours} hours ago. Change: ${rawInfo} `
+
+        // const modchangeInfo = page.locator(
+        //   "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
+        // );
+        // await dateLocator.waitFor({ timeout: 20000 });
+        // xpath
+        //div[@zindex='-1']//div[1]
+
+        //  press enter key
+      );
+    }
     // Each mod test asserts that it is NOT recent
     expect(isRecent).toBe(false);
 
@@ -129,5 +146,3 @@ for (const { id, name } of workshopMods) {
     await new Promise((r) => setTimeout(r, 2000));
   });
 }
-
-
