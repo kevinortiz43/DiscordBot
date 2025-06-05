@@ -22,7 +22,6 @@
     "@playwright/test": "^1.52.0",
     "@types/node": "^22.15.3",
     "eslint": "^9.25.1",
-    "playwright": "^1.52.0",
     "ts-node": "^10.9.2"
   },
   "dependencies": {
@@ -30,6 +29,7 @@
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "discord.js": "^14.19.2",
-    "discordbot": "file:"
+    "discordbot": "file:",
+    "playwright": "^1.52.0"
   }
 }
