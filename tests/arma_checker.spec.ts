@@ -88,7 +88,7 @@ async function sendDiscordNotification(modName: string, updateDate: Date, rawInf
               inline: false
             }
           ],
-          color: 0x1B2838, // Steam blue color
+          color: 0xFF0000, // Steam blue color
           timestamp: new Date().toISOString(),
           footer: {
             text: 'Arma 3 Steam Workshop Monitor'
