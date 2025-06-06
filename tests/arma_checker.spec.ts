@@ -5,8 +5,11 @@ import * as path from "path";
 import * as cheerio from "cheerio";
 import { parse, isValid } from "date-fns";
 
-// Configuration
-const Hours_ThresHold = 24;
+// // Production
+// const Hours_ThresHold = 7;
+
+// testing
+const Hours_ThresHold = 48;
 
 // Helper to parse Steam date format robustly with proper timezone handling
 function parseSteamDate(rawDateText: string): Date {
