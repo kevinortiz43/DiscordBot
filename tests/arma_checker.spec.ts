@@ -6,9 +6,9 @@ import * as cheerio from "cheerio";
 import { parse, isValid } from "date-fns";
 
 // Configuration
-const Hours_ThresHold = 48;
+const Hours_ThresHold = 24;
 
-// Helper to parse Steam date format robustly
+// Helper to parse Steam date format robustly with proper timezone handling
 function parseSteamDate(rawDateText: string): Date {
   let cleaned = rawDateText.trim().replace(/^[A-Za-z]+:\s*/, "");
 
@@ -22,11 +22,12 @@ function parseSteamDate(rawDateText: string): Date {
   const [, month, day, year, timePart, period] = match;
   const finalYear = year || new Date().getFullYear();
 
+  // Since Playwright is now set to Pacific Time, the date will be parsed correctly
   const fullDateStr = `${month} ${day}, ${finalYear} ${timePart} ${period}`;
 
   const formats = [
     "MMM d, yyyy h:mm a",
-    "MMM dd, yyyy h:mm a",
+    "MMM dd, yyyy h:mm a", 
     "MMM d yyyy h:mm a",
     "MMM d, yyyy h:mma",
     "MMM d, yyyy HH:mm",
@@ -35,6 +36,7 @@ function parseSteamDate(rawDateText: string): Date {
   for (const fmt of formats) {
     const candidate = parse(fullDateStr, fmt, new Date());
     if (isValid(candidate)) {
+      console.log(`Parsed Steam date "${rawDateText}" as: ${candidate.toISOString()}`);
       return candidate;
     }
   }
