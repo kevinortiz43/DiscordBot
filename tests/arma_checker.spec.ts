@@ -175,7 +175,8 @@ for (const { id, name } of workshopMods) {
       console.warn(`Mod ${nameOfMod} was recently updated`);
       
       // Take screenshot of the change notes section
-      const changeNotesSection = page.locator("//div[contains(@class,'detailBox workshopAnnouncement')]");
+      const changeNotesSection = page.locator( "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]");
+
       await changeNotesSection.waitFor({ timeout: 10000 });
       
       // Create screenshots directory if it doesn't exist
