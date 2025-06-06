@@ -6,10 +6,10 @@ import * as cheerio from "cheerio";
 import { parse, isValid } from "date-fns";
 
 //// Production
-const Hours_ThresHold = 7;
+// const Hours_ThresHold = 7;
 
 // Test
-// const Hours_ThresHold = 48;
+const Hours_ThresHold = 48;
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
@@ -50,7 +50,8 @@ async function sendDiscordNotification(
   modName: string,
   rawDateText: string,
   ageHours: string,
-  rawInfo: string
+  rawInfo: string,
+  message:string
 ): Promise<void> {
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
 
@@ -185,10 +186,11 @@ for (const { id, name } of workshopMods) {
     const ageHours = diffHours.toFixed(1);
 
     if (isRecent) {
-
+   const notificationMessage = `@kevin_9638`;
+   
 
       // Send Discord notification with raw date and calculated hours
-      await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
+      await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo, notificationMessage);
     }
 
     // Each mod test asserts that it is NOT recent
