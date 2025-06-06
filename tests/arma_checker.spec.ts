@@ -80,7 +80,7 @@ async function sendDiscordNotification(
               },
               {
                 name: "Updated",
-                value: rawDateText,
+                value: `${rawDateText} pst`,
                 inline: true,
               },
               {
@@ -185,7 +185,7 @@ for (const { id, name } of workshopMods) {
     const ageHours = diffHours.toFixed(1);
 
     if (isRecent) {
-      console.warn(`Mod ${nameOfMod} was recently updated`);
+
 
       // Send Discord notification with raw date and calculated hours
       await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
