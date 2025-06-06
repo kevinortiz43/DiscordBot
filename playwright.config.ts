@@ -35,15 +35,14 @@ export default defineConfig({
     trace: "on-first-retry",
   },
 
+
   projects: [
-    // { name: 'setup', testMatch: /.*\.setup\.ts/ },
     {
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        // REMOVED: storageState line - no automatic Discord auth for all tests
+
       },
-      // dependencies: ['setup'],
     },
 
     // {

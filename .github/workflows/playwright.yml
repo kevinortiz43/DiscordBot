@@ -29,9 +29,5 @@ jobs:
 
       - name: Run Playwright Tests
         run: npx playwright test --workers=4
-        # env: 
-        #   NOTIFIERURL:      ${{secrets.NOTIFIERURL}}
-        #   NOTIFIERUSERNAME: ${{ secrets.NOTIFIERUSERNAME }}
-        #   NOTIFIERPASSWORD: ${{ secrets.NOTIFIERPASSWORD }}
-        #   NOTIFIERSECONDURL: ${{secrets.NOTIFIERSECONDURL}}
-        
+        env: 
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}

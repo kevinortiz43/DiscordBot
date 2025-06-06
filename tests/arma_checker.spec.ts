@@ -6,8 +6,7 @@ import * as cheerio from "cheerio";
 import { parse, isValid } from "date-fns";
 
 // Configuration
-
-const Hours_ThresHold = 7;
+const Hours_ThresHold = 48;
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
@@ -43,6 +42,48 @@ function parseSteamDate(rawDateText: string): Date {
   throw new Error(`Could not parse date: "${fullDateStr}"`);
 }
 
+// Simple Discord webhook function
+async function sendDiscordNotification(message: string): Promise<void> {
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  
+  if (!webhookUrl) {
+    console.error('DISCORD_WEBHOOK_URL environment variable not set');
+    return;
+  }
+
+  try {
+    console.log('Sending Discord notification...');
+    
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        content: message,
+        username: 'Arma 3  Steam Workshop Monitor',
+        embeds: [{
+          title: 'Arma 3 Steam Workshop Update',
+          description: message,
+          color: 0x1B2838, // Steam blue color
+          timestamp: new Date().toISOString(),
+          footer: {
+            text: 'Arma 3 Steam Workshop Monitor'
+          }
+        }]
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Discord webhook failed: ${response.status} ${response.statusText}`);
+    }
+
+    console.log('Discord notification sent successfully');
+  } catch (error) {
+    console.error('Error sending Discord notification:', error);
+  }
+}
+
 // Read all HTML files from the data directory
 const dataDir = path.join(process.cwd(), "data");
 type ModEntry = { id: string; name: string };
@@ -53,8 +94,6 @@ try {
   const htmlFiles = files.filter(
     (file) => path.extname(file).toLowerCase() === ".html"
   );
-
-  // console.log(`Found ${htmlFiles.length} HTML files in data directory`);
 
   for (const file of htmlFiles) {
     const filePath = path.join(dataDir, file);
@@ -80,8 +119,6 @@ try {
       console.error(`Error processing file ${file}:`, fileError.message);
     }
   }
-
-  // console.log(`Found ${workshopMods.length} mods across all files`);
 } catch (dirError) {
   console.error(`Error reading data directory: ${dirError.message}`);
 }
@@ -95,16 +132,14 @@ for (const { id, name } of workshopMods) {
     );
 
     const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
-
     const modchangeInfo = page.locator(
       "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
     );
+    
     await dateLocator.waitFor({ timeout: 20000 });
 
     const nameOfMod = await page.locator(".workshopItemTitle").innerText();
     const rawDateText = await dateLocator.innerText();
-    // const rawInfo = await modchangeInfo.textContent();
-
     const rawInfo = await modchangeInfo.innerText();
 
     if (!rawDateText) throw new Error("No date text found");
@@ -113,21 +148,21 @@ for (const { id, name } of workshopMods) {
     const now = new Date();
     const diffMs = now.getTime() - lastUpdated.getTime();
     let diffHours = diffMs / (1000 * 60 * 60);
-    const isRecent = diffHours < Hours_ThresHold ;
+    const isRecent = diffHours < Hours_ThresHold;
     diffHours -= 3;
     const ageHours = diffHours.toFixed(1);
 
     if (isRecent) {
-      console.warn(
-
-
-
-
-        
-        `Mod ${nameOfMod} ${rawDateText} pst ${ageHours} hours ago. Change: ${rawInfo} `
-
-      );
+      const notificationMessage = `Mod ${nameOfMod} 
+      updated ${ageHours} hours ago. At ${rawDateText}pst 
+      nChange: ${rawInfo}`;
+      
+      console.warn(notificationMessage);
+      
+      // Send Discord notification for the recently updated mod
+      await sendDiscordNotification(notificationMessage);
     }
+
     // Each mod test asserts that it is NOT recent
     expect(isRecent).toBe(false);
 

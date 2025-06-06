@@ -5,7 +5,4 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
-discord.json
-playwright/.auth
-# tests/auth.setup.ts
 .env
