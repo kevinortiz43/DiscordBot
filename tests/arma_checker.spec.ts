@@ -5,11 +5,8 @@ import * as path from "path";
 import * as cheerio from "cheerio";
 import { parse, isValid } from "date-fns";
 
-// // Production
-// const Hours_ThresHold = 7;
-// // Testing
+// Configuration
 const Hours_ThresHold = 48;
-
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
@@ -66,9 +63,9 @@ async function sendDiscordNotification(modName: string, updateDate: Date, rawInf
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        username: 'Tech Priest Notifier',
+        username: 'Steam Workshop Monitor',
         embeds: [{
-          title: 'Arma 3 mod update',
+          title: 'Arma 3 Steam Workshop Update',
           fields: [
             {
               name: 'Mod',
@@ -77,7 +74,7 @@ async function sendDiscordNotification(modName: string, updateDate: Date, rawInf
             },
             {
               name: 'Updated',
-              value: `<t:${discordTimestamp}:R>`, // Relative time 
+              value: `<t:${discordTimestamp}:R>`, // Relative time format
               inline: true
             },
             {
@@ -91,10 +88,10 @@ async function sendDiscordNotification(modName: string, updateDate: Date, rawInf
               inline: false
             }
           ],
-          color: 0x1FF0000, // Steam blue color
+          color: 0x1B2838, // Steam blue color
           timestamp: new Date().toISOString(),
           footer: {
-            text: 'Arma 3 mod updater'
+            text: 'Arma 3 Steam Workshop Monitor'
           }
         }]
       }),
