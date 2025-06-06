@@ -6,11 +6,10 @@ import * as cheerio from "cheerio";
 import { parse, isValid } from "date-fns";
 
 //// Production
-// const Hours_ThresHold = 7;
-
+const Hours_ThresHold = 7;
 
 // Test
-const Hours_ThresHold = 48;
+// const Hours_ThresHold = 48;
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
@@ -47,64 +46,73 @@ function parseSteamDate(rawDateText: string): Date {
 }
 
 // Simple Discord webhook function with raw date and hours
-async function sendDiscordNotification(modName: string, rawDateText: string, ageHours: string, rawInfo: string): Promise<void> {
+async function sendDiscordNotification(
+  modName: string,
+  rawDateText: string,
+  ageHours: string,
+  rawInfo: string
+): Promise<void> {
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-  
+
   if (!webhookUrl) {
-    console.error('DISCORD_WEBHOOK_URL environment variable not set');
+    console.error("DISCORD_WEBHOOK_URL environment variable not set");
     return;
   }
 
   try {
-    console.log('Sending Discord notification...');
-    
+    console.log("Sending Discord notification...");
+
     const response = await fetch(webhookUrl, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        username: 'Steam Workshop Monitor',
-        embeds: [{
-          title: 'Arma 3 mod update',
-          fields: [
-            {
-              name: 'Mod',
-              value: modName,
-              inline: false
+        username: "Steam Workshop Monitor",
+        embeds: [
+          {
+            title: "Arma 3 mod update",
+            fields: [
+              {
+                name: "Mod",
+                value: modName,
+                inline: false,
+              },
+              {
+                name: "Updated",
+                value: rawDateText,
+                inline: true,
+              },
+              {
+                name: "Hours Ago",
+                value: `${ageHours} hours ago`,
+                inline: true,
+              },
+              {
+                name: "Change",
+                value: rawInfo || "No change description available",
+                inline: false,
+              },
+            ],
+            color: 0xff0000, // Steam blue color
+            timestamp: new Date().toISOString(),
+            footer: {
+              text: "Arma 3 Steam Workshop Monitor",
             },
-            {
-              name: 'Updated',
-              value: rawDateText,
-              inline: true
-            },
-            {
-              name: 'Hours Ago',
-              value: `${ageHours} hours ago`,
-              inline: true
-            },
-            {
-              name: 'Change',
-              value: rawInfo || 'No change description available',
-              inline: false
-            }
-          ],
-          color: 0xFF0000, // Steam blue color
-          timestamp: new Date().toISOString(),
-          footer: {
-            text: 'Arma 3 Steam Workshop Monitor'
-          }
-        }]
+          },
+        ],
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`Discord webhook failed: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Discord webhook failed: ${response.status} ${response.statusText}`
+      );
     }
 
-    console.log('Discord notification sent successfully');
+    console.log("Discord notification sent successfully");
   } catch (error) {
-    console.error('Error sending Discord notification:', error);
+    console.error("Error sending Discord notification:", error);
   }
 }
 
@@ -159,7 +167,7 @@ for (const { id, name } of workshopMods) {
     const modchangeInfo = page.locator(
       "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
     );
-    
+
     await dateLocator.waitFor({ timeout: 20000 });
 
     const nameOfMod = await page.locator(".workshopItemTitle").innerText();
@@ -178,7 +186,7 @@ for (const { id, name } of workshopMods) {
 
     if (isRecent) {
       console.warn(`Mod ${nameOfMod} was recently updated`);
-      
+
       // Send Discord notification with raw date and calculated hours
       await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
     }
