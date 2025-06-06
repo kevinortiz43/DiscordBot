@@ -7,5 +7,5 @@ node_modules/
 /playwright/.cache/
 discord.json
 playwright/.auth
-tests/auth.setup.ts
+# tests/auth.setup.ts
 .env
