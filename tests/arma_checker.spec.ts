@@ -119,24 +119,19 @@ for (const { id, name } of workshopMods) {
 
     if (isRecent) {
       console.warn(
-        // Discord url
-        // https://discord.com/channels/512149091946463245/863524960437927966
 
-        //       test(`Mod ${name} - Check recent update`, async ({ page }) => {
-        // await page.goto(`https://steamcommunity.com/sharedfiles/filedetails/changelog/${id}`,{waitUntil: "domcontentloaded",});
 
-        // const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
+
+        // import { test, expect } from '@playwright/test';
+// test('test', async ({ page }) => {
+//   await page.goto('https://discord.com/channels/512149091946463245/863524960437927966');
+//   await expect(page.getByRole('button', { name: 'Continue in Browser' })).toBeVisible();
+//   await page.getByRole('button', { name: 'Continue in Browser' }).click();
+// });
+
         
         `Mod ${nameOfMod} ${rawDateText} pst ${ageHours} hours ago. Change: ${rawInfo} `
 
-        // const modchangeInfo = page.locator(
-        //   "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
-        // );
-        // await dateLocator.waitFor({ timeout: 20000 });
-        // xpath
-        //div[@zindex='-1']//div[1]
-
-        //  press enter key
       );
     }
     // Each mod test asserts that it is NOT recent
