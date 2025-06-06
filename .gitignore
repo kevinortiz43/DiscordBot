@@ -8,4 +8,4 @@ node_modules/
 discord.json
 playwright/.auth
 tests/auth.setup.ts
-
+.env
