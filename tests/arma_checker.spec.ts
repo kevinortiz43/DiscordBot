@@ -69,6 +69,7 @@ async function sendDiscordNotification(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        content:message,
         username: "Steam Workshop Monitor",
         embeds: [
           {
