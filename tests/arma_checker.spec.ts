@@ -153,11 +153,13 @@ for (const { id, name } of workshopMods) {
     const ageHours = diffHours.toFixed(1);
 
     if (isRecent) {
-      const notificationMessage = `Mod ${nameOfMod} 
-      updated ${ageHours} hours ago. At ${rawDateText}pst 
-      nChange: ${rawInfo}`;
+      const notificationMessage = `
+      Mod: ${nameOfMod} 
+      Updated: ${ageHours} hours ago. 
+      On ${rawDateText} pst 
+      Change: ${rawInfo}`;
       
-      console.warn(notificationMessage);
+      // console.warn(notificationMessage);
       
       // Send Discord notification for the recently updated mod
       await sendDiscordNotification(notificationMessage);
