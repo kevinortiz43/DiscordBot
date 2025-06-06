@@ -65,7 +65,7 @@ async function sendDiscordNotification(modName: string, updateDate: Date, rawInf
       body: JSON.stringify({
         username: 'Steam Workshop Monitor',
         embeds: [{
-          title: 'Arma 3 Steam Workshop Update',
+          title: 'Tech Priest Notifier',
           fields: [
             {
               name: 'Mod',
