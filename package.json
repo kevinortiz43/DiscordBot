@@ -20,6 +20,7 @@
     "@cucumber/cucumber": "^11.2.0",
     "@eslint/js": "^9.25.1",
     "@playwright/test": "^1.52.0",
+    "@types/form-data": "^2.2.1",
     "@types/node": "^22.15.3",
     "eslint": "^9.25.1",
     "ts-node": "^10.9.2"
@@ -30,6 +31,7 @@
     "date-fns-tz": "^3.2.0",
     "discord.js": "^14.19.2",
     "discordbot": "file:",
+    "form-data": "^4.0.3",
     "playwright": "^1.52.0"
   }
 }
