@@ -5,8 +5,11 @@ import * as path from "path";
 import * as cheerio from "cheerio";
 import { parse, isValid } from "date-fns";
 
-// Configuration
+// // Production
+// const Hours_ThresHold = 7;
+// // Testing
 const Hours_ThresHold = 48;
+
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
@@ -42,8 +45,8 @@ function parseSteamDate(rawDateText: string): Date {
   throw new Error(`Could not parse date: "${fullDateStr}"`);
 }
 
-// Simple Discord webhook function
-async function sendDiscordNotification(message: string): Promise<void> {
+// Simple Discord webhook function with relative timestamps
+async function sendDiscordNotification(modName: string, updateDate: Date, rawInfo: string): Promise<void> {
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
   
   if (!webhookUrl) {
@@ -54,21 +57,44 @@ async function sendDiscordNotification(message: string): Promise<void> {
   try {
     console.log('Sending Discord notification...');
     
+    // Convert update date to Discord timestamp format (Unix timestamp)
+    const discordTimestamp = Math.floor(updateDate.getTime() / 1000);
+    
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        content: message,
-        username: 'Arma 3  Steam Workshop Monitor',
+        username: 'Tech Priest Notifier',
         embeds: [{
-          title: 'Arma 3 Steam Workshop Update',
-          description: message,
-          color: 0x1B2838, // Steam blue color
+          title: 'Arma 3 mod update',
+          fields: [
+            {
+              name: 'Mod',
+              value: modName,
+              inline: false
+            },
+            {
+              name: 'Updated',
+              value: `<t:${discordTimestamp}:R>`, // Relative time 
+              inline: true
+            },
+            {
+              name: 'On Update',
+              value: `<t:${discordTimestamp}:f>`, // Full date format
+              inline: true
+            },
+            {
+              name: 'Change',
+              value: rawInfo || 'No change description available',
+              inline: false
+            }
+          ],
+          color: 0x1FF0000, // Steam blue color
           timestamp: new Date().toISOString(),
           footer: {
-            text: 'Arma 3 Steam Workshop Monitor'
+            text: 'Arma 3 mod updater'
           }
         }]
       }),
@@ -153,16 +179,10 @@ for (const { id, name } of workshopMods) {
     const ageHours = diffHours.toFixed(1);
 
     if (isRecent) {
-      const notificationMessage = `
-      Mod: ${nameOfMod} 
-      Updated: ${ageHours} hours ago. 
-      On ${rawDateText} pst 
-      Change: ${rawInfo}`;
+      console.warn(`Mod ${nameOfMod} was recently updated`);
       
-      // console.warn(notificationMessage);
-      
-      // Send Discord notification for the recently updated mod
-      await sendDiscordNotification(notificationMessage);
+      // Send Discord notification for the recently updated mod (only embed, no content)
+      await sendDiscordNotification(nameOfMod, lastUpdated, rawInfo);
     }
 
     // Each mod test asserts that it is NOT recent
