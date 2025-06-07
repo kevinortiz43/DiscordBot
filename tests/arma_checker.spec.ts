@@ -180,7 +180,7 @@ for (const { id, name } of workshopMods) {
     const now = new Date();
     const diffMs = now.getTime() - lastUpdated.getTime();
     let diffHours = diffMs / (1000 * 60 * 60);
-    const isRecent = diffHours < Hours_ThresHold;
+    const isRecent = diffHours < Hours_ThresHold +3;
     diffHours;
     const ageHours = diffHours.toFixed(1);
 
