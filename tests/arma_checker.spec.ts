@@ -74,22 +74,22 @@ async function sendDiscordNotification(
             title: "Arma 3 mod update",
             fields: [
               {
-                name: "Mod",
+                name: "Mod:",
                 value: modName,
                 inline: false,
               },
               {
-                name: "Updated",
+                name: "Updated:",
                 value: `${rawDateText} pst`,
                 inline: true,
               },
               {
-                name: "Hours Ago",
+                name: "When:",
                 value: `${ageHours} hours ago`,
                 inline: true,
               },
               {
-                name: "Change",
+                name: "Change:",
                 value: rawInfo || "No change description available",
                 inline: false,
               },
@@ -180,21 +180,18 @@ for (const { id, name } of workshopMods) {
     const now = new Date();
     const diffMs = now.getTime() - lastUpdated.getTime();
     let diffHours = diffMs / (1000 * 60 * 60);
-    const isRecent = diffHours < Hours_ThresHold +3;
-    diffHours+7;
+    const isRecent = diffHours < Hours_ThresHold + 3;
+    diffHours -= 7;
     const ageHours = diffHours.toFixed(1);
 
     if (isRecent) {
-
-
-      // Send Discord notification with raw date and calculated hours
-      await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
-    }else{
       console.warn(`
         Name: ${nameOfMod}
         Date: ${rawDateText}
         Hours Ago: ${ageHours}
-        Info: ${rawInfo}`)
+        Info: ${rawInfo}`);
+      // Send Discord notification with raw date and calculated hours
+      await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
     }
 
     // Each mod test asserts that it is NOT recent
