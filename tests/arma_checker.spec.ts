@@ -180,7 +180,7 @@ for (const { id, name } of workshopMods) {
     const now = new Date();
     const diffMs = now.getTime() - lastUpdated.getTime();
     let diffHours = diffMs / (1000 * 60 * 60);
-    const isRecent = diffHours < Hours_ThresHold + 3;
+    const isRecent = diffHours < Hours_ThresHold + 7;
     diffHours -= 7;
     const ageHours = diffHours.toFixed(1);
 
@@ -189,16 +189,22 @@ for (const { id, name } of workshopMods) {
         Name: ${nameOfMod}
         Date: ${rawDateText}
         Hours Ago: ${ageHours}
-        Info: ${rawInfo}`);
+        Info: ${rawInfo}
+        Hours Threshold ${Hours_ThresHold}
+        `);
+        
       // Send Discord notification with raw date and calculated hours
       await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
-    }else{
-       console.warn(`
-        Name: ${nameOfMod}
-        Date: ${rawDateText}
-        Hours Ago: ${ageHours}`);
-
     }
+    // else{
+    //    console.warn(`
+    //     Name: ${nameOfMod}
+    //     Date: ${rawDateText}
+    //     Hours Ago: ${ageHours}
+        
+    //     `);
+
+    // }
 
     // Each mod test asserts that it is NOT recent
     expect(isRecent).toBe(false);
