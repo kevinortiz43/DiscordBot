@@ -192,6 +192,12 @@ for (const { id, name } of workshopMods) {
         Info: ${rawInfo}`);
       // Send Discord notification with raw date and calculated hours
       await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
+    }else{
+       console.warn(`
+        Name: ${nameOfMod}
+        Date: ${rawDateText}
+        Hours Ago: ${ageHours}`);
+
     }
 
     // Each mod test asserts that it is NOT recent
