@@ -6,10 +6,10 @@ import * as cheerio from "cheerio";
 import { parse, isValid } from "date-fns";
 
 //// Production
-// const Hours_ThresHold = 7;
+const Hours_ThresHold = 7;
 
 // Test
-const Hours_ThresHold = 900;
+// const Hours_ThresHold = 48;
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
@@ -62,55 +62,121 @@ async function sendDiscordNotification(
   try {
     console.log("Sending Discord notification...");
 
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        username: "Steam Workshop Monitor",
-        embeds: [
-          {
-            title: "Arma 3 mod update",
-            fields: [
-              {
-                name: "Mod:",
-                value: modName,
-                inline: false,
-              },
-              {
-                name: "Date:",
-                value: `${rawDateText} pst`,
-                inline: true,
-              },
-              {
-                name: "When:",
-                value: `${ageHours} hours ago`,
-                inline: true,
-              },
-              {
-                name: "Change:",
-                value: rawInfo || "No change description available",
-                inline: false,
-              },
-            ],
-            color: 0xff0000, // Steam blue color
-            timestamp: new Date().toISOString(),
-            footer: {
-              text: "Arma 3 Steam Workshop Monitor",
-            },
-          },
-        ],
-      }),
-    });
+    // Discord embed field value limit is 1024 characters
+    const MAX_FIELD_LENGTH = 1024;
+    const DELAY_BETWEEN_MESSAGES = 1000; // 1 second delay between messages
 
-    if (!response.ok) {
-      throw new Error(
-        `Discord webhook failed: ${response.status} ${response.statusText}`
-      );
+    // Helper function to send a single embed
+    const sendEmbed = async (changeValue: string, isFirstMessage: boolean = false, messageIndex: number = 0) => {
+      const embed = {
+        title: isFirstMessage ? "Arma 3 mod update" : `Arma 3 mod update (continued ${messageIndex})`,
+        fields: [] as any[],
+        color: 0xff0000,
+        timestamp: new Date().toISOString(),
+        footer: {
+          text: "Arma 3 Steam Workshop Monitor",
+        },
+      };
+
+      // Only include mod info in the first message
+      if (isFirstMessage) {
+        embed.fields.push(
+          {
+            name: "Mod:",
+            value: modName,
+            inline: false,
+          },
+          {
+            name: "Date:",
+            value: `${rawDateText} pst`,
+            inline: true,
+          },
+          {
+            name: "When:",
+            value: `${ageHours} hours ago`,
+            inline: true,
+          }
+        );
+      }
+
+      embed.fields.push({
+        name: isFirstMessage ? "Change:" : "Change (continued):",
+        value: changeValue,
+        inline: false,
+      });
+
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: "Steam Workshop Monitor",
+          embeds: [embed],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Discord webhook failed: ${response.status} ${response.statusText}`
+        );
+      }
+    };
+
+    // Handle empty or missing change info
+    if (!rawInfo || rawInfo.trim() === "") {
+      await sendEmbed("No change description available", true);
+      console.log("Discord notification sent successfully");
+      return;
     }
 
-    console.log("Discord notification sent successfully");
+    // If the change info fits in one message, send it normally
+    if (rawInfo.length <= MAX_FIELD_LENGTH) {
+      await sendEmbed(rawInfo, true);
+      console.log("Discord notification sent successfully");
+      return;
+    }
+
+    // Split long change info into chunks
+    const chunks: string[] = [];
+    let currentChunk = "";
+    const lines = rawInfo.split('\n');
+
+    for (const line of lines) {
+      // Check if adding this line would exceed the limit
+      const testChunk = currentChunk + (currentChunk ? '\n' : '') + line;
+      
+      if (testChunk.length > MAX_FIELD_LENGTH) {
+        // If the current chunk has content, save it and start a new one
+        if (currentChunk) {
+          chunks.push(currentChunk);
+          currentChunk = line;
+        } else {
+          // If a single line is too long, truncate it
+          chunks.push(line.substring(0, MAX_FIELD_LENGTH - 3) + "...");
+          currentChunk = "";
+        }
+      } else {
+        currentChunk = testChunk;
+      }
+    }
+
+    // Add the final chunk if it has content
+    if (currentChunk) {
+      chunks.push(currentChunk);
+    }
+
+    // Send each chunk as a separate message
+    for (let i = 0; i < chunks.length; i++) {
+      await sendEmbed(chunks[i], i === 0, i + 1);
+      
+      // Add delay between messages (except after the last one)
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_MESSAGES));
+      }
+    }
+
+    console.log(`Discord notification sent successfully (${chunks.length} messages)`);
   } catch (error) {
     console.error("Error sending Discord notification:", error);
   }
