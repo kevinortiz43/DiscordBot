@@ -79,7 +79,7 @@ async function sendDiscordNotification(
                 inline: false,
               },
               {
-                name: "Updated:",
+                name: "Date:",
                 value: `${rawDateText} pst`,
                 inline: true,
               },
