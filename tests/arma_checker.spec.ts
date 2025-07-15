@@ -6,10 +6,10 @@ import * as cheerio from "cheerio";
 import { parse, isValid } from "date-fns";
 
 //// Production
-const Hours_ThresHold = 7;
+// const Hours_ThresHold = 7;
 
 // Test
-// const Hours_ThresHold = 48;
+const Hours_ThresHold = 900;
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
