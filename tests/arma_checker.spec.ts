@@ -112,7 +112,7 @@ async function sendDiscordNotification(
         },
         body: JSON.stringify({
           username: "Steam Workshop Monitor",
-          content: `${process.env.DEVOPS1}`,
+          content: "<@187308786334171136>",
           embeds: [embed],
         }),
       });
