@@ -8,6 +8,8 @@ import { parse, isValid } from "date-fns";
 //// Production
 const Hours_ThresHold = 7;
 
+// 50 seconds
+const amountOfTime = 60000;
 // Test
 // const Hours_ThresHold = 48;
 
@@ -67,9 +69,15 @@ async function sendDiscordNotification(
     const DELAY_BETWEEN_MESSAGES = 1000; // 1 second delay between messages
 
     // Helper function to send a single embed
-    const sendEmbed = async (changeValue: string, isFirstMessage: boolean = false, messageIndex: number = 0) => {
+    const sendEmbed = async (
+      changeValue: string,
+      isFirstMessage: boolean = false,
+      messageIndex: number = 0
+    ) => {
       const embed = {
-        title: isFirstMessage ? "Arma 3 mod update" : `Arma 3 mod update (continued ${messageIndex})`,
+        title: isFirstMessage
+          ? "Arma 3 mod update"
+          : `Arma 3 mod update (continued ${messageIndex})`,
         fields: [] as any[],
         color: 0xff0000,
         timestamp: new Date().toISOString(),
@@ -112,7 +120,8 @@ async function sendDiscordNotification(
         },
         body: JSON.stringify({
           username: "Steam Workshop Monitor",
-          content: "<@170736049918574592>  <@112652970008539136> <@111328594881482752> ",
+          content:
+            "<@170736049918574592>  <@112652970008539136> <@111328594881482752> ",
           embeds: [embed],
         }),
       });
@@ -141,12 +150,12 @@ async function sendDiscordNotification(
     // Split long change info into chunks
     const chunks: string[] = [];
     let currentChunk = "";
-    const lines = rawInfo.split('\n');
+    const lines = rawInfo.split("\n");
 
     for (const line of lines) {
       // Check if adding this line would exceed the limit
-      const testChunk = currentChunk + (currentChunk ? '\n' : '') + line;
-      
+      const testChunk = currentChunk + (currentChunk ? "\n" : "") + line;
+
       if (testChunk.length > MAX_FIELD_LENGTH) {
         // If the current chunk has content, save it and start a new one
         if (currentChunk) {
@@ -170,14 +179,18 @@ async function sendDiscordNotification(
     // Send each chunk as a separate message
     for (let i = 0; i < chunks.length; i++) {
       await sendEmbed(chunks[i], i === 0, i + 1);
-      
+
       // Add delay between messages (except after the last one)
       if (i < chunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_MESSAGES));
+        await new Promise((resolve) =>
+          setTimeout(resolve, DELAY_BETWEEN_MESSAGES)
+        );
       }
     }
 
-    console.log(`Discord notification sent successfully (${chunks.length} messages)`);
+    console.log(
+      `Discord notification sent successfully (${chunks.length} messages)`
+    );
   } catch (error) {
     console.error("Error sending Discord notification:", error);
   }
@@ -235,7 +248,7 @@ for (const { id, name } of workshopMods) {
       "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
     );
 
-    await dateLocator.waitFor({ timeout: 20000 });
+    await dateLocator.waitFor({ timeout: amountOfTime });
 
     const nameOfMod = await page.locator(".workshopItemTitle").innerText();
     const rawDateText = await dateLocator.innerText();
@@ -259,7 +272,7 @@ for (const { id, name } of workshopMods) {
         Info: ${rawInfo}
         Hours Threshold ${Hours_ThresHold}
         `);
-        
+
       // Send Discord notification with raw date and calculated hours
       await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
     }
@@ -268,7 +281,7 @@ for (const { id, name } of workshopMods) {
     //     Name: ${nameOfMod}
     //     Date: ${rawDateText}
     //     Hours Ago: ${ageHours}
-        
+
     //     `);
 
     // }
@@ -277,6 +290,6 @@ for (const { id, name } of workshopMods) {
     expect(isRecent).toBe(false);
 
     // Rate limiting
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, amountOfTime));
   });
 }
