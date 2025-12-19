@@ -9,7 +9,7 @@ import { parse, isValid } from "date-fns";
 const Hours_ThresHold = 7;
 
 // 50 seconds
-const amountOfTime = 60000;
+const amountOfTime = 360000;
 // Test
 // const Hours_ThresHold = 48;
 
