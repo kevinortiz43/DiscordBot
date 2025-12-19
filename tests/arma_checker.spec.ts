@@ -51,8 +51,7 @@ function parseSteamDate(rawDateText: string): Date {
 async function sendDiscordNotification(
   modName: string,
   rawDateText: string,
-  ageHours: string,
-  rawInfo: string
+  ageHours: string
 ): Promise<void> {
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
 
@@ -134,63 +133,63 @@ async function sendDiscordNotification(
     };
 
     // Handle empty or missing change info
-    if (!rawInfo || rawInfo.trim() === "") {
-      await sendEmbed("No change description available", true);
-      console.log("Discord notification sent successfully");
-      return;
-    }
+    // if (!rawInfo || rawInfo.trim() === "") {
+    //   await sendEmbed("No change description available", true);
+    //   console.log("Discord notification sent successfully");
+    //   return;
+    // }
 
-    // If the change info fits in one message, send it normally
-    if (rawInfo.length <= MAX_FIELD_LENGTH) {
-      await sendEmbed(rawInfo, true);
-      console.log("Discord notification sent successfully");
-      return;
-    }
+    // // If the change info fits in one message, send it normally
+    // if (rawInfo.length <= MAX_FIELD_LENGTH) {
+    //   await sendEmbed(rawInfo, true);
+    //   console.log("Discord notification sent successfully");
+    //   return;
+    // }
 
-    // Split long change info into chunks
-    const chunks: string[] = [];
-    let currentChunk = "";
-    const lines = rawInfo.split("\n");
+    // // Split long change info into chunks
+    // const chunks: string[] = [];
+    // let currentChunk = "";
+    // const lines = rawInfo.split("\n");
 
-    for (const line of lines) {
-      // Check if adding this line would exceed the limit
-      const testChunk = currentChunk + (currentChunk ? "\n" : "") + line;
+    // for (const line of lines) {
+    //   // Check if adding this line would exceed the limit
+    //   const testChunk = currentChunk + (currentChunk ? "\n" : "") + line;
 
-      if (testChunk.length > MAX_FIELD_LENGTH) {
-        // If the current chunk has content, save it and start a new one
-        if (currentChunk) {
-          chunks.push(currentChunk);
-          currentChunk = line;
-        } else {
-          // If a single line is too long, truncate it
-          chunks.push(line.substring(0, MAX_FIELD_LENGTH - 3) + "...");
-          currentChunk = "";
-        }
-      } else {
-        currentChunk = testChunk;
-      }
-    }
+    //   if (testChunk.length > MAX_FIELD_LENGTH) {
+    //     // If the current chunk has content, save it and start a new one
+    //     if (currentChunk) {
+    //       chunks.push(currentChunk);
+    //       currentChunk = line;
+    //     } else {
+    //       // If a single line is too long, truncate it
+    //       chunks.push(line.substring(0, MAX_FIELD_LENGTH - 3) + "...");
+    //       currentChunk = "";
+    //     }
+    //   } else {
+    //     currentChunk = testChunk;
+    //   }
+    // }
 
-    // Add the final chunk if it has content
-    if (currentChunk) {
-      chunks.push(currentChunk);
-    }
+    // // Add the final chunk if it has content
+    // if (currentChunk) {
+    //   chunks.push(currentChunk);
+    // }
 
-    // Send each chunk as a separate message
-    for (let i = 0; i < chunks.length; i++) {
-      await sendEmbed(chunks[i], i === 0, i + 1);
+    // // Send each chunk as a separate message
+    // for (let i = 0; i < chunks.length; i++) {
+    //   await sendEmbed(chunks[i], i === 0, i + 1);
 
-      // Add delay between messages (except after the last one)
-      if (i < chunks.length - 1) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, DELAY_BETWEEN_MESSAGES)
-        );
-      }
-    }
+    //   // Add delay between messages (except after the last one)
+    //   if (i < chunks.length - 1) {
+    //     await new Promise((resolve) =>
+    //       setTimeout(resolve, DELAY_BETWEEN_MESSAGES)
+    //     );
+    //   }
+    // }
 
-    console.log(
-      `Discord notification sent successfully (${chunks.length} messages)`
-    );
+    // console.log(
+    //   `Discord notification sent successfully (${chunks.length} messages)`
+    // );
   } catch (error) {
     console.error("Error sending Discord notification:", error);
   }
@@ -228,31 +227,32 @@ try {
         }
       });
     } catch (fileError) {
-      console.error(`Error processing file ${file}:`, fileError.message);
+      // console.error(`Error processing file ${file}:`, fileError.message);
     }
   }
 } catch (dirError) {
-  console.error(`Error reading data directory: ${dirError.message}`);
+  // console.error(`Error reading data directory: ${dirError.message}`);
 }
 
 // Create a separate test per mod using display name
 for (const { id, name } of workshopMods) {
   test(`Mod ${name} - Check recent update`, async ({ page }) => {
     await page.goto(
-      `https://steamcommunity.com/sharedfiles/filedetails/changelog/${id}`,
+      `https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`,
       { waitUntil: "domcontentloaded" }
     );
 
-    const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
-    const modchangeInfo = page.locator(
-      "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
-    );
+    const dateLocator2 = page.locator("(//div[@class='detailsStatRight'])[3]");
+    // const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
+    // const modchangeInfo = page.locator(
+    //   "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
+    // );
 
-    await dateLocator.waitFor({ timeout: amountOfTime });
+    await dateLocator2.waitFor({ timeout: amountOfTime });
 
     const nameOfMod = await page.locator(".workshopItemTitle").innerText();
-    const rawDateText = await dateLocator.innerText();
-    const rawInfo = await modchangeInfo.innerText();
+    const rawDateText = await dateLocator2.innerText();
+    // const rawInfo = await modchangeInfo.innerText();
 
     if (!rawDateText) throw new Error("No date text found");
 
@@ -269,12 +269,12 @@ for (const { id, name } of workshopMods) {
         Name: ${nameOfMod}
         Date: ${rawDateText}
         Hours Ago: ${ageHours}
-        Info: ${rawInfo}
+        
         Hours Threshold ${Hours_ThresHold}
         `);
 
       // Send Discord notification with raw date and calculated hours
-      await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
+      await sendDiscordNotification(nameOfMod, rawDateText, ageHours);
     }
     // else{
     //    console.warn(`
