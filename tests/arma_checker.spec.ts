@@ -292,9 +292,12 @@ for (const { id, name, batchIndex } of workshopMods) {
           `https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`,
           { 
             waitUntil: "domcontentloaded",
-            timeout: 60000 // 60 second timeout
+            timeout: 120000 // 120 second timeout
           }
         );
+
+        // Wait a bit for the page to fully load
+        await page.waitForTimeout(3000);
 
         // Check if we hit rate limiting
         if (await isRateLimited(page)) {
@@ -306,9 +309,12 @@ for (const { id, name, batchIndex } of workshopMods) {
           "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
         );
 
-        const nameOfMod = await page.locator(".workshopItemTitle").innerText();
-        const rawDateText = await dateLocator.innerText();
-        const changeInfo = await modchangeInfo.innerText();
+        // Wait for elements to be visible with longer timeout
+        await dateLocator.waitFor({ state: 'visible', timeout: 120000 });
+
+        const nameOfMod = await page.locator(".workshopItemTitle").innerText({ timeout: 30000 });
+        const rawDateText = await dateLocator.innerText({ timeout: 30000 });
+        const rawInfo = await modchangeInfo.innerText({ timeout: 30000 }).catch(() => "No change information available");
 
         if (!rawDateText) throw new Error("No date text found");
 
@@ -329,7 +335,7 @@ for (const { id, name, batchIndex } of workshopMods) {
             Hours Threshold ${Hours_ThresHold}
           `);
 
-          await sendDiscordNotification(nameOfMod, rawDateText, ageHours, changeInfo);
+          await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
         }
 
         expect(isRecent).toBe(false);
