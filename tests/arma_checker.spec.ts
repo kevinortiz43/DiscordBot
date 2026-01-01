@@ -6,7 +6,7 @@ import * as cheerio from "cheerio";
 import { parse, isValid } from "date-fns";
 
 //// Production
-const Hours_ThresHold = 7;
+const Hours_ThresHold = 24;
 
 // Improved rate limiting configuration
 const BASE_DELAY = 600000; // 10 minutes base delay (increased from 6)
@@ -30,7 +30,28 @@ function parseSteamDate(rawDateText: string): Date {
   }
 
   const [, month, day, year, timePart, period] = match;
-  const finalYear = year || new Date().getFullYear();
+  
+  // Smart year handling
+  let finalYear: number;
+  if (year) {
+    // Year explicitly provided
+    finalYear = parseInt(year);
+  } else {
+    // No year provided - need to determine if it's current year or last year
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    
+    // Try parsing with current year first
+    const testDateStr = `${month} ${day}, ${currentYear} ${timePart} ${period}`;
+    const testDate = parse(testDateStr, "MMM d, yyyy h:mm a", new Date());
+    
+    // If the parsed date is in the future, it must be from last year
+    if (testDate > now) {
+      finalYear = currentYear - 1;
+    } else {
+      finalYear = currentYear;
+    }
+  }
 
   const fullDateStr = `${month} ${day}, ${finalYear} ${timePart} ${period}`;
 
@@ -85,7 +106,7 @@ async function sendDiscordNotification(
   modName: string,
   rawDateText: string,
   ageHours: string,
-  changeInfo: string
+  rawInfo: string
 ): Promise<void> {
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
 
@@ -150,8 +171,7 @@ async function sendDiscordNotification(
         },
         body: JSON.stringify({
           username: "Steam Workshop Monitor",
-          content:
-            "<@170736049918574592>  <@112652970008539136> <@111328594881482752> ",
+          content: " ",
           embeds: [embed],
         }),
       });
@@ -289,7 +309,7 @@ for (const { id, name, batchIndex } of workshopMods) {
         console.log(`[Batch ${batchIndex}] Checking mod ${name} (attempt ${attempt + 1}/${MAX_RETRIES})`);
 
         await page.goto(
-          `https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`,
+          `https://steamcommunity.com/sharedfiles/filedetails/changelog/${id}`,
           { 
             waitUntil: "domcontentloaded",
             timeout: 120000 // 120 second timeout
@@ -317,9 +337,8 @@ for (const { id, name, batchIndex } of workshopMods) {
         const lastUpdated = parseSteamDate(rawDateText);
         const now = new Date();
         const diffMs = now.getTime() - lastUpdated.getTime();
-        let diffHours = diffMs / (1000 * 60 * 60);
-        const isRecent = diffHours < Hours_ThresHold + 7;
-        diffHours -= 7;
+        const diffHours = diffMs / (1000 * 60 * 60);
+        const isRecent = diffHours < Hours_ThresHold;
         const ageHours = diffHours.toFixed(1);
 
         if (isRecent) {
@@ -328,7 +347,7 @@ for (const { id, name, batchIndex } of workshopMods) {
             Date: ${rawDateText}
             Hours Ago: ${ageHours}
             
-            Hours Threshold ${Hours_ThresHold}
+            Hours Threshold: ${Hours_ThresHold}
           `);
 
           await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
