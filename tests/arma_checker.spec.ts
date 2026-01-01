@@ -16,7 +16,7 @@ const EXPONENTIAL_BACKOFF = true;
 
 // Parallel batch configuration
 const BATCH_SIZE = 3; // Number of mods to check in parallel
-const BATCH_STAGGER_DELAY = 120000; // 2 minutes between batch starts
+const BATCH_STAGGER_DELAY = 60000; // 2 minutes between batch starts
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
@@ -312,7 +312,7 @@ for (const { id, name, batchIndex } of workshopMods) {
           `https://steamcommunity.com/sharedfiles/filedetails/changelog/${id}`,
           { 
             waitUntil: "domcontentloaded",
-            timeout: 120000 // 120 second timeout
+            timeout: 60000 // 120 second timeout
           }
         );
 
