@@ -163,21 +163,21 @@ async function sendDiscordNotification(
       }
     };
 
-    if (!changeInfo || changeInfo.trim() === "") {
+    if (!rawInfo || rawInfo.trim() === "") {
       await sendEmbed("No change description available", true);
       console.log("Discord notification sent successfully");
       return;
     }
 
-    if (changeInfo.length <= MAX_FIELD_LENGTH) {
-      await sendEmbed(changeInfo, true);
+    if (rawInfo.length <= MAX_FIELD_LENGTH) {
+      await sendEmbed(rawInfo, true);
       console.log("Discord notification sent successfully");
       return;
     }
 
     const chunks: string[] = [];
     let currentChunk = "";
-    const lines = changeInfo.split("\n");
+    const lines = rawInfo.split("\n");
 
     for (const line of lines) {
       const testChunk = currentChunk + (currentChunk ? "\n" : "") + line;
@@ -305,16 +305,12 @@ for (const { id, name, batchIndex } of workshopMods) {
         }
 
         const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
-        const modchangeInfo = page.locator(
-          "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
-        );
+        const modchangeInfo = page.locator("(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]");
+        await dateLocator.waitFor({ timeout: 20000 });
 
-        // Wait for elements to be visible with longer timeout
-        await dateLocator.waitFor({ state: 'visible', timeout: 120000 });
-
-        const nameOfMod = await page.locator(".workshopItemTitle").innerText({ timeout: 30000 });
-        const rawDateText = await dateLocator.innerText({ timeout: 30000 });
-        const rawInfo = await modchangeInfo.innerText({ timeout: 30000 }).catch(() => "No change information available");
+        const nameOfMod = await page.locator(".workshopItemTitle").innerText();
+        const rawDateText = await dateLocator.innerText();
+        const rawInfo = await modchangeInfo.innerText();
 
         if (!rawDateText) throw new Error("No date text found");
 
