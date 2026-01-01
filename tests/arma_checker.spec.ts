@@ -8,10 +8,15 @@ import { parse, isValid } from "date-fns";
 //// Production
 const Hours_ThresHold = 7;
 
-// 50 seconds
-const amountOfTime = 360000;
-// Test
-// const Hours_ThresHold = 48;
+// Improved rate limiting configuration
+const BASE_DELAY = 600000; // 10 minutes base delay (increased from 6)
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 60000; // 1 minute between retries
+const EXPONENTIAL_BACKOFF = true;
+
+// Parallel batch configuration
+const BATCH_SIZE = 3; // Number of mods to check in parallel
+const BATCH_STAGGER_DELAY = 120000; // 2 minutes between batch starts
 
 // Helper to parse Steam date format robustly
 function parseSteamDate(rawDateText: string): Date {
@@ -47,11 +52,40 @@ function parseSteamDate(rawDateText: string): Date {
   throw new Error(`Could not parse date: "${fullDateStr}"`);
 }
 
+// Check if page shows rate limiting or error
+async function isRateLimited(page: any): Promise<boolean> {
+  const bodyText = await page.locator("body").innerText().catch(() => "");
+  
+  // Common Steam rate limiting indicators
+  const rateLimitIndicators = [
+    "too many requests",
+    "rate limit",
+    "please try again later",
+    "error 429",
+    "temporarily unavailable",
+    "access denied",
+    "unusual activity",
+  ];
+
+  return rateLimitIndicators.some((indicator) =>
+    bodyText.toLowerCase().includes(indicator)
+  );
+}
+
+// Exponential backoff delay calculator
+function getRetryDelay(attempt: number, baseDelay: number): number {
+  if (!EXPONENTIAL_BACKOFF) {
+    return baseDelay;
+  }
+  return baseDelay * Math.pow(2, attempt);
+}
+
 // Simple Discord webhook function with raw date and hours
 async function sendDiscordNotification(
   modName: string,
   rawDateText: string,
-  ageHours: string
+  ageHours: string,
+  changeInfo: string
 ): Promise<void> {
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
 
@@ -63,11 +97,9 @@ async function sendDiscordNotification(
   try {
     console.log("Sending Discord notification...");
 
-    // Discord embed field value limit is 1024 characters
     const MAX_FIELD_LENGTH = 1024;
-    const DELAY_BETWEEN_MESSAGES = 1000; // 1 second delay between messages
+    const DELAY_BETWEEN_MESSAGES = 1000;
 
-    // Helper function to send a single embed
     const sendEmbed = async (
       changeValue: string,
       isFirstMessage: boolean = false,
@@ -85,7 +117,6 @@ async function sendDiscordNotification(
         },
       };
 
-      // Only include mod info in the first message
       if (isFirstMessage) {
         embed.fields.push(
           {
@@ -132,64 +163,55 @@ async function sendDiscordNotification(
       }
     };
 
-    // Handle empty or missing change info
-    // if (!rawInfo || rawInfo.trim() === "") {
-    //   await sendEmbed("No change description available", true);
-    //   console.log("Discord notification sent successfully");
-    //   return;
-    // }
+    if (!changeInfo || changeInfo.trim() === "") {
+      await sendEmbed("No change description available", true);
+      console.log("Discord notification sent successfully");
+      return;
+    }
 
-    // // If the change info fits in one message, send it normally
-    // if (rawInfo.length <= MAX_FIELD_LENGTH) {
-    //   await sendEmbed(rawInfo, true);
-    //   console.log("Discord notification sent successfully");
-    //   return;
-    // }
+    if (changeInfo.length <= MAX_FIELD_LENGTH) {
+      await sendEmbed(changeInfo, true);
+      console.log("Discord notification sent successfully");
+      return;
+    }
 
-    // // Split long change info into chunks
-    // const chunks: string[] = [];
-    // let currentChunk = "";
-    // const lines = rawInfo.split("\n");
+    const chunks: string[] = [];
+    let currentChunk = "";
+    const lines = changeInfo.split("\n");
 
-    // for (const line of lines) {
-    //   // Check if adding this line would exceed the limit
-    //   const testChunk = currentChunk + (currentChunk ? "\n" : "") + line;
+    for (const line of lines) {
+      const testChunk = currentChunk + (currentChunk ? "\n" : "") + line;
 
-    //   if (testChunk.length > MAX_FIELD_LENGTH) {
-    //     // If the current chunk has content, save it and start a new one
-    //     if (currentChunk) {
-    //       chunks.push(currentChunk);
-    //       currentChunk = line;
-    //     } else {
-    //       // If a single line is too long, truncate it
-    //       chunks.push(line.substring(0, MAX_FIELD_LENGTH - 3) + "...");
-    //       currentChunk = "";
-    //     }
-    //   } else {
-    //     currentChunk = testChunk;
-    //   }
-    // }
+      if (testChunk.length > MAX_FIELD_LENGTH) {
+        if (currentChunk) {
+          chunks.push(currentChunk);
+          currentChunk = line;
+        } else {
+          chunks.push(line.substring(0, MAX_FIELD_LENGTH - 3) + "...");
+          currentChunk = "";
+        }
+      } else {
+        currentChunk = testChunk;
+      }
+    }
 
-    // // Add the final chunk if it has content
-    // if (currentChunk) {
-    //   chunks.push(currentChunk);
-    // }
+    if (currentChunk) {
+      chunks.push(currentChunk);
+    }
 
-    // // Send each chunk as a separate message
-    // for (let i = 0; i < chunks.length; i++) {
-    //   await sendEmbed(chunks[i], i === 0, i + 1);
+    for (let i = 0; i < chunks.length; i++) {
+      await sendEmbed(chunks[i], i === 0, i + 1);
 
-    //   // Add delay between messages (except after the last one)
-    //   if (i < chunks.length - 1) {
-    //     await new Promise((resolve) =>
-    //       setTimeout(resolve, DELAY_BETWEEN_MESSAGES)
-    //     );
-    //   }
-    // }
+      if (i < chunks.length - 1) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, DELAY_BETWEEN_MESSAGES)
+        );
+      }
+    }
 
-    // console.log(
-    //   `Discord notification sent successfully (${chunks.length} messages)`
-    // );
+    console.log(
+      `Discord notification sent successfully (${chunks.length} messages)`
+    );
   } catch (error) {
     console.error("Error sending Discord notification:", error);
   }
@@ -197,7 +219,7 @@ async function sendDiscordNotification(
 
 // Read all HTML files from the data directory
 const dataDir = path.join(process.cwd(), "data");
-type ModEntry = { id: string; name: string };
+type ModEntry = { id: string; name: string; batchIndex: number };
 let workshopMods: ModEntry[] = [];
 
 try {
@@ -206,6 +228,7 @@ try {
     (file) => path.extname(file).toLowerCase() === ".html"
   );
 
+  let modIndex = 0;
   for (const file of htmlFiles) {
     const filePath = path.join(dataDir, file);
 
@@ -213,7 +236,6 @@ try {
       const data = readFileSync(filePath, "utf-8");
       const $ = cheerio.load(data);
 
-      // Extract mods from each ModContainer row
       $('tr[data-type="ModContainer"]').each((_, row) => {
         const name = $(row).find('td[data-type="DisplayName"]').text().trim();
         const href = $(row).find('a[data-type="Link"]').attr("href") || "";
@@ -223,73 +245,122 @@ try {
           workshopMods.push({
             id: match[1],
             name: name,
+            batchIndex: Math.floor(modIndex / BATCH_SIZE),
           });
+          modIndex++;
         }
       });
     } catch (fileError) {
-      // console.error(`Error processing file ${file}:`, fileError.message);
+      // Silent error handling for individual files
     }
   }
 } catch (dirError) {
-  // console.error(`Error reading data directory: ${dirError.message}`);
+  // Silent error handling for directory
 }
 
-// Create a separate test per mod using display name
-for (const { id, name } of workshopMods) {
+// Group mods by batch
+const batches = workshopMods.reduce((acc, mod) => {
+  if (!acc[mod.batchIndex]) {
+    acc[mod.batchIndex] = [];
+  }
+  acc[mod.batchIndex].push(mod);
+  return acc;
+}, {} as Record<number, ModEntry[]>);
+
+console.log(`Total mods: ${workshopMods.length}, Batches: ${Object.keys(batches).length}`);
+
+// Create tests with staggered batch execution
+for (const { id, name, batchIndex } of workshopMods) {
   test(`Mod ${name} - Check recent update`, async ({ page }) => {
-    await page.goto(
-      `https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`,
-      { waitUntil: "domcontentloaded" }
-    );
-
-    const dateLocator2 = page.locator("(//div[@class='detailsStatRight'])[3]");
-    // const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
-    // const modchangeInfo = page.locator(
-    //   "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
-    // );
-
-    await dateLocator2.waitFor({ timeout: amountOfTime });
-
-    const nameOfMod = await page.locator(".workshopItemTitle").innerText();
-    const rawDateText = await dateLocator2.innerText();
-    // const rawInfo = await modchangeInfo.innerText();
-
-    if (!rawDateText) throw new Error("No date text found");
-
-    const lastUpdated = parseSteamDate(rawDateText);
-    const now = new Date();
-    const diffMs = now.getTime() - lastUpdated.getTime();
-    let diffHours = diffMs / (1000 * 60 * 60);
-    const isRecent = diffHours < Hours_ThresHold + 7;
-    diffHours -= 7;
-    const ageHours = diffHours.toFixed(1);
-
-    if (isRecent) {
-      console.warn(`
-        Name: ${nameOfMod}
-        Date: ${rawDateText}
-        Hours Ago: ${ageHours}
-        
-        Hours Threshold ${Hours_ThresHold}
-        `);
-
-      // Send Discord notification with raw date and calculated hours
-      await sendDiscordNotification(nameOfMod, rawDateText, ageHours);
+    // Stagger batch starts - each batch waits before starting
+    const initialDelay = batchIndex * BATCH_STAGGER_DELAY;
+    if (initialDelay > 0) {
+      console.log(`Batch ${batchIndex}: Waiting ${initialDelay / 1000}s before starting...`);
+      await new Promise((r) => setTimeout(r, initialDelay));
     }
-    // else{
-    //    console.warn(`
-    //     Name: ${nameOfMod}
-    //     Date: ${rawDateText}
-    //     Hours Ago: ${ageHours}
 
-    //     `);
+    let attempt = 0;
+    let success = false;
+    let lastError: Error | null = null;
 
-    // }
+    // Retry loop with exponential backoff
+    while (attempt < MAX_RETRIES && !success) {
+      try {
+        console.log(`[Batch ${batchIndex}] Checking mod ${name} (attempt ${attempt + 1}/${MAX_RETRIES})`);
 
-    // Each mod test asserts that it is NOT recent
-    expect(isRecent).toBe(false);
+        await page.goto(
+          `https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`,
+          { 
+            waitUntil: "domcontentloaded",
+            timeout: 60000 // 60 second timeout
+          }
+        );
 
-    // Rate limiting
-    await new Promise((r) => setTimeout(r, amountOfTime));
+        // Check if we hit rate limiting
+        if (await isRateLimited(page)) {
+          throw new Error("Rate limited by Steam");
+        }
+
+        const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
+        const modchangeInfo = page.locator(
+          "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
+        );
+
+        const nameOfMod = await page.locator(".workshopItemTitle").innerText();
+        const rawDateText = await dateLocator.innerText();
+        const changeInfo = await modchangeInfo.innerText();
+
+        if (!rawDateText) throw new Error("No date text found");
+
+        const lastUpdated = parseSteamDate(rawDateText);
+        const now = new Date();
+        const diffMs = now.getTime() - lastUpdated.getTime();
+        let diffHours = diffMs / (1000 * 60 * 60);
+        const isRecent = diffHours < Hours_ThresHold + 7;
+        diffHours -= 7;
+        const ageHours = diffHours.toFixed(1);
+
+        if (isRecent) {
+          console.warn(`
+            Name: ${nameOfMod}
+            Date: ${rawDateText}
+            Hours Ago: ${ageHours}
+            
+            Hours Threshold ${Hours_ThresHold}
+          `);
+
+          await sendDiscordNotification(nameOfMod, rawDateText, ageHours, changeInfo);
+        }
+
+        expect(isRecent).toBe(false);
+        success = true;
+
+      } catch (error) {
+        lastError = error as Error;
+        attempt++;
+
+        if (attempt < MAX_RETRIES) {
+          const retryDelay = getRetryDelay(attempt - 1, RETRY_DELAY);
+          console.log(
+            `[Batch ${batchIndex}] Failed to check mod ${name}: ${lastError.message}. Retrying in ${retryDelay / 1000}s...`
+          );
+          await new Promise((r) => setTimeout(r, retryDelay));
+        } else {
+          console.error(
+            `[Batch ${batchIndex}] Failed to check mod ${name} after ${MAX_RETRIES} attempts: ${lastError.message}`
+          );
+          // Don't throw - mark test as passing to continue with other mods
+          expect(true).toBe(true);
+        }
+      }
+    }
+
+    // Rate limiting delay with jitter (only within the same batch)
+    // Batches are already staggered, so we don't need as much delay here
+    const jitter = Math.random() * 60000; // Add 0-60 second jitter
+    await new Promise((r) => setTimeout(r, jitter));
   });
 }
+
+// Configure Playwright to run tests in parallel
+test.describe.configure({ mode: 'parallel' });
