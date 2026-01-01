@@ -29,6 +29,6 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Run Playwright Tests
-        run: npx playwright test --workers=1
+        run: npx playwright test --workers=4
         env: 
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
