@@ -8,11 +8,7 @@ on:
   
   # Schedule: Every 6 hours starting at midnight Eastern Time (5 AM UTC)
   schedule:
-<<<<<<< HEAD
     - cron: '0 16 * * *'  # 4 PM UTC dail
-=======
-  #  - cron: '0 5/6 * * *'  # 5 AM, 11 AM, 5 PM, 11 PM UTC = Midnight, 6 #AM, Noon, 6 PM ET
->>>>>>> f25967629b423a7766b89d57ba1e8907fd77b458
 
 jobs:
   test:
@@ -33,10 +29,6 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Run Playwright Tests
-<<<<<<< HEAD
         run: npx playwright test --workers=1 --max-failures=1   
-=======
-        run: npx playwright test --workers=2
->>>>>>> f25967629b423a7766b89d57ba1e8907fd77b458
         env: 
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
