@@ -11,15 +11,13 @@ const Hours_ThresHold = 24;
 // Test
 // const Hours_ThresHold = 48;
 
-// Rate limiting detection and backoff management
-let rateLimitDetected = false;
-let backoffAttempts = 0;
-const MAX_BACKOFF_ATTEMPTS = 3;
-const BASE_BACKOFF_MS = 15 * 60 * 1000; // 15 minutes
+// Jitter configuration (in milliseconds)
+const BASE_DELAY = 2000; // Base delay of 2 seconds
+const JITTER_RANGE = 2000; // Random jitter between 0-2000ms
 
-// Calculate exponential backoff delay
-function getBackoffDelay(attempt: number): number {
-  return BASE_BACKOFF_MS * Math.pow(2, attempt);
+// Helper function to add jitter
+function getRandomDelay(base: number, jitterRange: number): number {
+  return base + Math.floor(Math.random() * jitterRange);
 }
 
 // Helper to parse Steam date format robustly
@@ -34,13 +32,7 @@ function parseSteamDate(rawDateText: string): Date {
   }
 
   const [, month, day, year, timePart, period] = match;
-  const currentYear = new Date().getFullYear();
-  const finalYear = year ? parseInt(year) : currentYear;
-
-  // Validate year is reasonable (not in the future)
-  if (finalYear > currentYear) {
-    throw new Error(`Invalid year in date: ${finalYear} (current year: ${currentYear})`);
-  }
+  const finalYear = year || new Date().getFullYear();
 
   const fullDateStr = `${month} ${day}, ${finalYear} ${timePart} ${period}`;
 
@@ -129,7 +121,7 @@ async function sendDiscordNotification(
         },
         body: JSON.stringify({
           username: "Steam Workshop Monitor",
-          content: "<@170736049918574592>  <@112652970008539136> <@111328594881482752> ",
+          content: "",
           embeds: [embed],
         }),
       });
@@ -239,143 +231,54 @@ try {
   console.error(`Error reading data directory: ${dirError.message}`);
 }
 
-// Randomize the mod order using Fisher-Yates shuffle
-function shuffleArray<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
-
-const randomizedMods = shuffleArray(workshopMods);
-
-// Create a separate test per mod using display name with randomized order
-for (let modIndex = 0; modIndex < randomizedMods.length; modIndex++) {
-  const { id, name } = randomizedMods[modIndex];
-  
+// Create a separate test per mod using display name
+for (const { id, name } of workshopMods) {
   test(`Mod ${name} - Check recent update`, async ({ page }) => {
-    let retryAttempt = 0;
-    let success = false;
+    await page.goto(
+      `https://steamcommunity.com/sharedfiles/filedetails/changelog/${id}`,
+      { waitUntil: "domcontentloaded" }
+    );
 
-    while (!success && retryAttempt <= MAX_BACKOFF_ATTEMPTS) {
-      // Add delay between tests (3-5 seconds random) on first attempt or between retries
-      const delayMs = 3000 + Math.floor(Math.random() * 2000);
-      if (modIndex > 0 || retryAttempt > 0) {
-        await new Promise((r) => setTimeout(r, delayMs));
-      }
+    const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
+    const modchangeInfo = page.locator(
+      "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
+    );
 
-      try {
-        const response = await page.goto(
-          `https://steamcommunity.com/sharedfiles/filedetails/changelog/${id}`,
-          { waitUntil: "domcontentloaded", timeout: 30000 }
-        );
+    await dateLocator.waitFor({ timeout: 20000 });
 
-        // Check for rate limiting (HTTP 429 or specific Steam rate limit page)
-        if (response?.status() === 429) {
-          throw new Error("RATE_LIMIT_429");
-        }
+    const nameOfMod = await page.locator(".workshopItemTitle").innerText();
+    const rawDateText = await dateLocator.innerText();
+    const rawInfo = await modchangeInfo.innerText();
 
-        // Check page content for rate limit messages
-        const pageContent = await page.content();
-        if (pageContent.includes("rate limit") || 
-            pageContent.includes("too many requests") ||
-            pageContent.includes("Please wait")) {
-          throw new Error("RATE_LIMIT_CONTENT");
-        }
+    if (!rawDateText) throw new Error("No date text found");
 
-        const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
-        const modchangeInfo = page.locator(
-          "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
-        );
+    const lastUpdated = parseSteamDate(rawDateText);
+    const now = new Date();
+    const diffMs = now.getTime() - lastUpdated.getTime();
+    let diffHours = diffMs / (1000 * 60 * 60);
+    const isRecent = diffHours < Hours_ThresHold + 7;
+    diffHours -= 7;
+    const ageHours = diffHours.toFixed(1);
 
-        await dateLocator.waitFor({ timeout: 20000 });
-
-        const nameOfMod = await page.locator(".workshopItemTitle").innerText();
-        const rawDateText = await dateLocator.innerText();
-        const rawInfo = await modchangeInfo.innerText();
-
-        if (!rawDateText) throw new Error("No date text found");
-
-        const lastUpdated = parseSteamDate(rawDateText);
-        const now = new Date();
-        const diffMs = now.getTime() - lastUpdated.getTime();
+    if (isRecent) {
+      console.warn(`
+        Name: ${nameOfMod}
+        Date: ${rawDateText}
+        Hours Ago: ${ageHours}
+        Info: ${rawInfo}
+        Hours Threshold ${Hours_ThresHold}
+        `);
         
-        // Check for negative time difference (date in future or parsing error)
-        if (diffMs < 0) {
-          console.error(`Invalid date detected for mod ${nameOfMod}: date appears to be in the future`);
-          console.error(`Raw date: ${rawDateText}, Parsed: ${lastUpdated}, Current: ${now}`);
-          throw new Error(`Invalid date: ${rawDateText} - date is in the future`);
-        }
-        
-        let diffHours = diffMs / (1000 * 60 * 60);
-        const isRecent = diffHours < Hours_ThresHold + 7;
-        diffHours -= 7;
-        const ageHours = diffHours.toFixed(1);
-        
-        // Additional check: only send notification if ageHours is positive and reasonable
-        if (isRecent && parseFloat(ageHours) >= 0) {
-          console.warn(`
-            Name: ${nameOfMod}
-            Date: ${rawDateText}
-            Hours Ago: ${ageHours}
-            Info: ${rawInfo}
-            Hours Threshold ${Hours_ThresHold}
-            `);
-            
-          // Send Discord notification with raw date and calculated hours
-          await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
-        }
-
-        // Each mod test asserts that it is NOT recent
-        expect(isRecent).toBe(false);
-        
-        // Mark as successful
-        success = true;
-        rateLimitDetected = false;
-
-      } catch (error) {
-        // Check if error is related to rate limiting
-        const errorMessage = error.toString();
-        const isRateLimit = errorMessage.includes("RATE_LIMIT") || 
-                           errorMessage.includes("429") || 
-                           errorMessage.toLowerCase().includes("rate limit") || 
-                           errorMessage.toLowerCase().includes("too many requests");
-        
-        if (isRateLimit) {
-          rateLimitDetected = true;
-          
-          if (retryAttempt < MAX_BACKOFF_ATTEMPTS) {
-            const backoffDelay = getBackoffDelay(retryAttempt);
-            const backoffMinutes = (backoffDelay / 60000).toFixed(1);
-            
-            console.error(`
-╔════════════════════════════════════════════════════════════════╗
-║ RATE LIMIT DETECTED for mod: ${name.padEnd(31)}║
-║ Attempt: ${(retryAttempt + 1).toString().padEnd(53)}║
-║ Waiting ${backoffMinutes} minutes before retrying...${' '.repeat(Math.max(0, 22 - backoffMinutes.length))}║
-╚════════════════════════════════════════════════════════════════╝
-            `);
-            
-            await new Promise(resolve => setTimeout(resolve, backoffDelay));
-            retryAttempt++;
-          } else {
-            console.error(`
-╔════════════════════════════════════════════════════════════════╗
-║ MAX BACKOFF ATTEMPTS REACHED for mod: ${name.padEnd(23)}║
-║ Skipping this mod and continuing...                           ║
-╚════════════════════════════════════════════════════════════════╝
-            `);
-            test.skip();
-            return;
-          }
-        } else {
-          // If it's another type of error, log it and throw
-          console.error(`Error checking mod ${name}:`, error);
-          throw error;
-        }
-      }
+      // Send Discord notification with raw date and calculated hours
+      await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
     }
+
+    // Each mod test asserts that it is NOT recent
+    expect(isRecent).toBe(false);
+
+    // Rate limiting with jitter
+    const delay = getRandomDelay(BASE_DELAY, JITTER_RANGE);
+    console.log(`Waiting ${delay}ms before next test...`);
+    await new Promise((r) => setTimeout(r, delay));
   });
 }
