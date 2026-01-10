@@ -12,8 +12,8 @@ const Hours_ThresHold = 24;
 // const Hours_ThresHold = 48;
 
 // Jitter configuration (in milliseconds)
-const BASE_DELAY = 2000; // Base delay of 2 seconds
-const JITTER_RANGE = 5000; // Random jitter between 0-2000ms
+const BASE_DELAY = 5000; // Base delay of 5 seconds
+const JITTER_RANGE = 5000; // Random jitter between 0s-5s
 
 // Helper function to add jitter
 function getRandomDelay(base: number, jitterRange: number): number {
@@ -244,7 +244,7 @@ for (const { id, name } of workshopMods) {
       "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
     );
 
-    await dateLocator.waitFor({ timeout: 20000 });
+    await dateLocator.waitFor({ timeout: 30000 });
 
     const nameOfMod = await page.locator(".workshopItemTitle").innerText();
     const rawDateText = await dateLocator.innerText();
