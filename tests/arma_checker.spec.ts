@@ -6,7 +6,7 @@ import * as cheerio from "cheerio";
 import { parse, isValid } from "date-fns";
 
 //// Production
-const Hours_ThresHold = 24;
+const Hours_ThresHold = 12;
 
 // Test
 // const Hours_ThresHold = 48;

@@ -7,10 +7,9 @@ on:
   # Trigger on git push/PR to main/master
   push:
     branches: [main, master]
-  
-  # Schedule: Every 6 hours starting at midnight Eastern Time (5 AM UTC)
+
   schedule:
-    - cron: '0 16 * * *'  # 4 PM UTC dail
+    - cron: '0 1/12 * * *'  # 4 PM UTC dail
 
 jobs:
   test:
