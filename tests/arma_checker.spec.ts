@@ -12,8 +12,8 @@ const Hours_ThresHold = 12;
 // const Hours_ThresHold = 48;
 
 // Jitter configuration (in milliseconds)
-const BASE_DELAY = 10000; // Base delay of 5 seconds
-const JITTER_RANGE = 10000; // Random jitter between 0s-5s
+const BASE_DELAY = 6000; // Base delay of 5 seconds
+const JITTER_RANGE = 7000; // Random jitter between 0s-5s
 
 // Helper function to add jitter
 function getRandomDelay(base: number, jitterRange: number): number {
