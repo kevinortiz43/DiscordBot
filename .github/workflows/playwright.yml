@@ -1,4 +1,4 @@
-name: Playwright Tests
+name: Steam Workshop Monitor
 
 on:
   push:
@@ -7,45 +7,22 @@ on:
     - cron: '0 1/12 * * *'
 
 jobs:
-  test:
-    timeout-minutes: 60
+  check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm ci
+      - run: npm ci
 
-      # Cache Playwright browsers by the Playwright version in package-lock
-      - name: Cache Playwright Browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            playwright-${{ runner.os }}-
-
-      - name: Install Playwright Browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-
-      # Even on cache hit, system deps (libnss3, etc.) still need to be present
-      - name: Install Playwright System Dependencies
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
-
-      - name: Verify Playwright
-        run: npx playwright --version
-
-      - name: Run Playwright Tests
-        run: npx playwright test --workers=1
+      - name: Check mod updates
+        run: npx ts-node check-updates.ts
         env:
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}

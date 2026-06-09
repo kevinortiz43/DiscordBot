@@ -1,284 +1,227 @@
-import { test, expect } from "@playwright/test";
-import { readFileSync } from "fs";
 import * as fs from "fs";
 import * as path from "path";
 import * as cheerio from "cheerio";
-import { parse, isValid } from "date-fns";
 
-//// Production
-const Hours_ThresHold = 12;
+// ── Config ────────────────────────────────────────────────────────────────────
+const HOURS_THRESHOLD = 12;
+const STEAM_API_KEY = process.env.STEAM_API_KEY ?? "";
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL ?? "";
 
-// Test
-// const Hours_ThresHold = 48;
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface ModEntry { id: string; name: string }
 
-// Jitter configuration (in milliseconds)
-const BASE_DELAY = 6000; // Base delay of 5 seconds
-const JITTER_RANGE = 7000; // Random jitter between 0s-5s
-
-// Helper function to add jitter
-function getRandomDelay(base: number, jitterRange: number): number {
-  return base + Math.floor(Math.random() * jitterRange);
+interface SteamFileDetail {
+  publishedfileid: string;
+  title: string;
+  time_updated: number;
+  short_description: string;
+  result: number;
 }
 
-// Helper to parse Steam date format robustly
-function parseSteamDate(rawDateText: string): Date {
-  let cleaned = rawDateText.trim().replace(/^[A-Za-z]+:\s*/, "");
+// ── Read mod IDs from HTML files ──────────────────────────────────────────────
+function loadMods(): ModEntry[] {
+  const dataDir = path.join(process.cwd(), "data");
+  const mods: ModEntry[] = [];
 
-  const match = cleaned.match(
-    /^([A-Za-z]{3})\s+(\d{1,2})(?:,\s+(\d{4}))?\s*@\s*(\d{1,2}:\d{2})\s*([ap]m)$/i
-  );
-  if (!match) {
-    throw new Error(`Failed to extract date components from "${rawDateText}"`);
+  for (const file of fs.readdirSync(dataDir).filter(f => f.endsWith(".html"))) {
+    const $ = cheerio.load(fs.readFileSync(path.join(dataDir, file), "utf-8"));
+    $('tr[data-type="ModContainer"]').each((_, row) => {
+      const name = $(row).find('td[data-type="DisplayName"]').text().trim();
+      const href = $(row).find('a[data-type="Link"]').attr("href") ?? "";
+      const match = href.match(/[?&]id=(\d+)/);
+      if (match?.[1] && name) mods.push({ id: match[1], name });
+    });
   }
 
-  const [, month, day, year, timePart, period] = match;
-  const finalYear = year || new Date().getFullYear();
-
-  const fullDateStr = `${month} ${day}, ${finalYear} ${timePart} ${period}`;
-
-  const formats = [
-    "MMM d, yyyy h:mm a",
-    "MMM dd, yyyy h:mm a",
-    "MMM d yyyy h:mm a",
-    "MMM d, yyyy h:mma",
-    "MMM d, yyyy HH:mm",
-  ];
-
-  for (const fmt of formats) {
-    const candidate = parse(fullDateStr, fmt, new Date());
-    if (isValid(candidate)) {
-      return candidate;
-    }
-  }
-
-  throw new Error(`Could not parse date: "${fullDateStr}"`);
+  return mods;
 }
 
-// Simple Discord webhook function with raw date and hours
-async function sendDiscordNotification(
-  modName: string,
-  rawDateText: string,
-  ageHours: string,
-  rawInfo: string
-): Promise<void> {
-  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+// ── Fetch file details from Steam Web API in batches of 100 ──────────────────
+async function fetchSteamDetails(ids: string[]): Promise<SteamFileDetail[]> {
+  const BATCH = 100;
+  const results: SteamFileDetail[] = [];
 
-  if (!webhookUrl) {
-    console.error("DISCORD_WEBHOOK_URL environment variable not set");
-    return;
-  }
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const batch = ids.slice(i, i + BATCH);
+    const params = new URLSearchParams();
+    params.append("key", STEAM_API_KEY);
+    params.append("itemcount", String(batch.length));
+    batch.forEach((id, idx) => params.append(`publishedfileids[${idx}]`, id));
 
-  try {
-    console.log("Sending Discord notification...");
+    const res = await fetch(
+      "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/",
+      { method: "POST", body: params }
+    );
 
-    // Discord embed field value limit is 1024 characters
-    const MAX_FIELD_LENGTH = 1024;
-    const DELAY_BETWEEN_MESSAGES = 1000; // 1 second delay between messages
+    if (!res.ok) throw new Error(`Steam API error: ${res.status} ${res.statusText}`);
 
-    // Helper function to send a single embed
-    const sendEmbed = async (changeValue: string, isFirstMessage: boolean = false, messageIndex: number = 0) => {
-      const embed = {
-        title: isFirstMessage ? "Arma 3 mod update" : `Arma 3 mod update (continued ${messageIndex})`,
-        fields: [] as any[],
-        color: 0xff0000,
-        timestamp: new Date().toISOString(),
-        footer: {
-          text: "Arma 3 Steam Workshop Monitor",
-        },
-      };
-
-      // Only include mod info in the first message
-      if (isFirstMessage) {
-        embed.fields.push(
-          {
-            name: "Mod:",
-            value: modName,
-            inline: false,
-          },
-          {
-            name: "Date:",
-            value: `${rawDateText} pst`,
-            inline: true,
-          },
-          {
-            name: "When:",
-            value: `${ageHours} hours ago`,
-            inline: true,
-          }
-        );
-      }
-
-      embed.fields.push({
-        name: isFirstMessage ? "Change:" : "Change (continued):",
-        value: changeValue,
-        inline: false,
-      });
-
-      const response = await fetch(webhookUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: "Steam Workshop Monitor",
-          content: "",
-          embeds: [embed],
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Discord webhook failed: ${response.status} ${response.statusText}`
-        );
-      }
+    const json = await res.json() as {
+      response: { publishedfiledetails: SteamFileDetail[] }
     };
 
-    // Handle empty or missing change info
-    if (!rawInfo || rawInfo.trim() === "") {
-      await sendEmbed("No change description available", true);
-      console.log("Discord notification sent successfully");
-      return;
+    results.push(...json.response.publishedfiledetails);
+  }
+
+  return results;
+}
+
+// ── Scrape the latest changelog entry for a single mod ────────────────────────
+// Only called for mods already confirmed as recently updated by the API,
+// so typically 0-2 requests per run — well under any rate limit.
+async function fetchLatestChangelog(modId: string): Promise<string> {
+  const url = `https://steamcommunity.com/sharedfiles/filedetails/changelog/${modId}`;
+
+  try {
+    const res = await fetch(url, {
+      headers: {
+        // Identify as a regular browser to avoid bot detection
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+
+    if (!res.ok) {
+      console.warn(`  Changelog fetch failed for ${modId}: ${res.status}`);
+      return "Could not retrieve changelog.";
     }
 
-    // If the change info fits in one message, send it normally
-    if (rawInfo.length <= MAX_FIELD_LENGTH) {
-      await sendEmbed(rawInfo, true);
-      console.log("Discord notification sent successfully");
-      return;
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    // First .detailBox.workshopAnnouncement block = latest changelog entry
+    const changelogBox = $(".detailBox.workshopAnnouncement").first();
+
+    if (!changelogBox.length) {
+      return "No changelog entries found.";
     }
 
-    // Split long change info into chunks
-    const chunks: string[] = [];
-    let currentChunk = "";
-    const lines = rawInfo.split('\n');
+    // Extract all <p> text within the entry, preserving line breaks
+    const lines: string[] = [];
+    changelogBox.find("p").each((_, el) => {
+      const text = $(el).text().trim();
+      if (text) lines.push(text);
+    });
 
-    for (const line of lines) {
-      // Check if adding this line would exceed the limit
-      const testChunk = currentChunk + (currentChunk ? '\n' : '') + line;
-      
-      if (testChunk.length > MAX_FIELD_LENGTH) {
-        // If the current chunk has content, save it and start a new one
-        if (currentChunk) {
-          chunks.push(currentChunk);
-          currentChunk = line;
-        } else {
-          // If a single line is too long, truncate it
-          chunks.push(line.substring(0, MAX_FIELD_LENGTH - 3) + "...");
-          currentChunk = "";
-        }
-      } else {
-        currentChunk = testChunk;
-      }
-    }
+    const result = lines.join("\n").trim();
+    return result || "Changelog entry was empty.";
 
-    // Add the final chunk if it has content
-    if (currentChunk) {
-      chunks.push(currentChunk);
-    }
-
-    // Send each chunk as a separate message
-    for (let i = 0; i < chunks.length; i++) {
-      await sendEmbed(chunks[i], i === 0, i + 1);
-      
-      // Add delay between messages (except after the last one)
-      if (i < chunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_MESSAGES));
-      }
-    }
-
-    console.log(`Discord notification sent successfully (${chunks.length} messages)`);
-  } catch (error) {
-    console.error("Error sending Discord notification:", error);
+  } catch (err) {
+    console.warn(`  Changelog fetch error for ${modId}:`, err);
+    return "Error retrieving changelog.";
   }
 }
 
-// Read all HTML files from the data directory
-const dataDir = path.join(process.cwd(), "data");
-type ModEntry = { id: string; name: string };
-let workshopMods: ModEntry[] = [];
+// ── Discord notification ──────────────────────────────────────────────────────
+async function sendDiscord(
+  modId: string,
+  modName: string,
+  updatedAt: Date,
+  ageHours: string,
+  changelog: string
+): Promise<void> {
+  if (!DISCORD_WEBHOOK_URL) { console.error("DISCORD_WEBHOOK_URL not set"); return; }
 
-try {
-  const files = fs.readdirSync(dataDir);
-  const htmlFiles = files.filter(
-    (file) => path.extname(file).toLowerCase() === ".html"
-  );
+  const MAX = 1024;
+  const chunks = changelog.trim().length === 0
+    ? ["No changelog available."]
+    : chunkText(changelog, MAX);
 
-  for (const file of htmlFiles) {
-    const filePath = path.join(dataDir, file);
+  for (let i = 0; i < chunks.length; i++) {
+    const isFirst = i === 0;
+    const fields: object[] = [];
 
-    try {
-      const data = readFileSync(filePath, "utf-8");
-      const $ = cheerio.load(data);
-
-      // Extract mods from each ModContainer row
-      $('tr[data-type="ModContainer"]').each((_, row) => {
-        const name = $(row).find('td[data-type="DisplayName"]').text().trim();
-        const href = $(row).find('a[data-type="Link"]').attr("href") || "";
-        const match = href.match(/[?&]id=(\d+)/);
-
-        if (match && match[1] && name) {
-          workshopMods.push({
-            id: match[1],
-            name: name,
-          });
-        }
-      });
-    } catch (fileError) {
-      console.error(`Error processing file ${file}:`, fileError.message);
+    if (isFirst) {
+      fields.push(
+        { name: "Mod", value: `[${modName}](https://steamcommunity.com/sharedfiles/filedetails/?id=${modId})`, inline: false },
+        { name: "Updated", value: updatedAt.toUTCString(), inline: true },
+        { name: "Age", value: `${ageHours}h ago`, inline: true }
+      );
     }
+
+    fields.push({
+      name: isFirst ? "Changelog" : "Changelog (continued)",
+      value: chunks[i],
+      inline: false,
+    });
+
+    const embed = {
+      title: isFirst ? "🔔 Arma 3 Mod Update" : `🔔 Arma 3 Mod Update (cont. ${i + 1})`,
+      color: 0xff0000,
+      timestamp: new Date().toISOString(),
+      footer: { text: "Steam Workshop Monitor" },
+      fields,
+    };
+
+    const res = await fetch(DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "Steam Workshop Monitor", content: "", embeds: [embed] }),
+    });
+
+    if (!res.ok) throw new Error(`Discord error: ${res.status} ${res.statusText}`);
+    if (i < chunks.length - 1) await sleep(1000);
   }
-} catch (dirError) {
-  console.error(`Error reading data directory: ${dirError.message}`);
+
+  console.log(`  ✓ Discord notified (${chunks.length} message(s))`);
 }
 
-// Create a separate test per mod using display name
-for (const { id, name } of workshopMods) {
-  test(`Mod ${name} - Check recent update`, async ({ page }) => {
-    await page.goto(
-      `https://steamcommunity.com/sharedfiles/filedetails/changelog/${id}`,
-      { waitUntil: "domcontentloaded" }
-    );
+function chunkText(text: string, max: number): string[] {
+  const chunks: string[] = [];
+  let current = "";
+  for (const line of text.split("\n")) {
+    const candidate = current ? `${current}\n${line}` : line;
+    if (candidate.length > max) {
+      if (current) chunks.push(current);
+      current = line.length > max ? line.slice(0, max - 3) + "..." : line;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
 
-    const dateLocator = page.locator("(//div[@class='changelog headline'])[1]");
-    const modchangeInfo = page.locator(
-      "(//div[contains(@class,'detailBox workshopAnnouncement')]//p)[1]"
-    );
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-    await dateLocator.waitFor({ timeout: 30000 });
+// ── Main ──────────────────────────────────────────────────────────────────────
+async function main() {
+  if (!STEAM_API_KEY) { console.error("STEAM_API_KEY not set"); process.exit(1); }
 
-    const nameOfMod = await page.locator(".workshopItemTitle").innerText();
-    const rawDateText = await dateLocator.innerText();
-    const rawInfo = await modchangeInfo.innerText();
+  const mods = loadMods();
+  console.log(`Loaded ${mods.length} mod(s)`);
 
-    if (!rawDateText) throw new Error("No date text found");
+  const details = await fetchSteamDetails(mods.map(m => m.id));
+  const nameById = Object.fromEntries(mods.map(m => [m.id, m.name]));
 
-    const lastUpdated = parseSteamDate(rawDateText);
-    const now = new Date();
-    const diffMs = now.getTime() - lastUpdated.getTime();
-    let diffHours = diffMs / (1000 * 60 * 60);
-    const isRecent = diffHours < Hours_ThresHold + 7;
-    diffHours -= 1;
-    const ageHours = diffHours.toFixed(1);
+  const now = Date.now();
+  let recentCount = 0;
+
+  for (const detail of details) {
+    if (detail.result !== 1) {
+      console.warn(`  Skipping ${detail.publishedfileid}: result=${detail.result}`);
+      continue;
+    }
+
+    const updatedAt = new Date(detail.time_updated * 1000);
+    const ageHours = ((now - updatedAt.getTime()) / 3_600_000).toFixed(1);
+    const isRecent = parseFloat(ageHours) < HOURS_THRESHOLD;
+    const displayName = nameById[detail.publishedfileid] ?? detail.title;
+
+    console.log(`[${detail.publishedfileid}] ${displayName} — ${ageHours}h ago ${isRecent ? "⚠ RECENT" : ""}`);
 
     if (isRecent) {
-      console.warn(`
-        Name: ${nameOfMod}
-        Date: ${rawDateText}
-        Hours Ago: ${ageHours}
-        Info: ${rawInfo}
-        Hours Threshold ${Hours_ThresHold}
-        `);
-        
-      // Send Discord notification with raw date and calculated hours
-      await sendDiscordNotification(nameOfMod, rawDateText, ageHours, rawInfo);
+      recentCount++;
+      console.log(`  Fetching changelog for ${detail.publishedfileid}...`);
+
+      // Small courtesy delay before hitting the community page
+      await sleep(2000);
+      const changelog = await fetchLatestChangelog(detail.publishedfileid);
+
+      await sendDiscord(detail.publishedfileid, displayName, updatedAt, ageHours, changelog);
     }
+  }
 
-    // Each mod test asserts that it is NOT recent
-    expect(isRecent).toBe(false);
-
-    // Rate limiting with jitter
-    const delay = getRandomDelay(BASE_DELAY, JITTER_RANGE);
-    console.log(`Waiting ${delay}ms before next test...`);
-    await new Promise((r) => setTimeout(r, delay));
-  });
+  console.log(`\nDone. ${recentCount} recent update(s) found.`);
 }
+
+main().catch(err => { console.error(err); process.exit(1); });
