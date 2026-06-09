@@ -5,7 +5,7 @@ import * as path from "path";
 import * as cheerio from "cheerio";
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const HOURS_THRESHOLD = 12;
+const HOURS_THRESHOLD = 8;
 const STEAM_API_KEY = process.env.STEAM_API_KEY ?? "";
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL ?? "";
 
