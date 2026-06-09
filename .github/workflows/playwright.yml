@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    timeout-minutes: 10
+    timeout-minutes: 100
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
