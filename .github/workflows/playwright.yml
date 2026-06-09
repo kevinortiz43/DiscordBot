@@ -24,12 +24,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Debug - show test file exists
+      - name: Debug - show repo structure
         run: |
-          echo "=== Config file ==="
-          cat playwright.config.ts
-          echo "=== Test file ==="
-          ls -la playwright/tests/
+          echo "=== Root ==="
+          ls -la
+          echo "=== playwright/ (if exists) ==="
+          ls -la playwright/ || echo "playwright/ folder NOT FOUND"
+          echo "=== .gitignore ==="
+          cat .gitignore || echo "no .gitignore"
 
       - name: Run mod update check
         run: npx playwright test --config=playwright.config.ts --workers=1
