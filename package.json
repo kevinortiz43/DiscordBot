@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "scripts": {},
+  "scripts": {
+  "check-updates": "ts-node check-updates.ts"
+},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kevinortiz43/DiscordBot.git"
@@ -35,4 +37,6 @@
     "minimatch": "^10.2.4",
     "playwright": "^1.52.0"
   }
+
+
 }
