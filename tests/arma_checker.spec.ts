@@ -1,3 +1,5 @@
+import { test } from "@playwright/test";
+import { readFileSync } from "fs";
 import * as fs from "fs";
 import * as path from "path";
 import * as cheerio from "cheerio";
@@ -18,25 +20,29 @@ interface SteamFileDetail {
   result: number;
 }
 
-// ── Read mod IDs from HTML files ──────────────────────────────────────────────
-function loadMods(): ModEntry[] {
-  const dataDir = path.join(process.cwd(), "data");
-  const mods: ModEntry[] = [];
+// ── Load mods from HTML files in /data ───────────────────────────────────────
+const dataDir = path.join(process.cwd(), "data");
+const workshopMods: ModEntry[] = [];
 
-  for (const file of fs.readdirSync(dataDir).filter(f => f.endsWith(".html"))) {
-    const $ = cheerio.load(fs.readFileSync(path.join(dataDir, file), "utf-8"));
-    $('tr[data-type="ModContainer"]').each((_, row) => {
-      const name = $(row).find('td[data-type="DisplayName"]').text().trim();
-      const href = $(row).find('a[data-type="Link"]').attr("href") ?? "";
-      const match = href.match(/[?&]id=(\d+)/);
-      if (match?.[1] && name) mods.push({ id: match[1], name });
-    });
+try {
+  for (const file of fs.readdirSync(dataDir).filter(f => path.extname(f).toLowerCase() === ".html")) {
+    try {
+      const $ = cheerio.load(readFileSync(path.join(dataDir, file), "utf-8"));
+      $('tr[data-type="ModContainer"]').each((_, row) => {
+        const name = $(row).find('td[data-type="DisplayName"]').text().trim();
+        const href = $(row).find('a[data-type="Link"]').attr("href") ?? "";
+        const match = href.match(/[?&]id=(\d+)/);
+        if (match?.[1] && name) workshopMods.push({ id: match[1], name });
+      });
+    } catch (e: any) {
+      console.error(`Error processing file ${file}:`, e.message);
+    }
   }
-
-  return mods;
+} catch (e: any) {
+  console.error("Error reading data directory:", e.message);
 }
 
-// ── Fetch file details from Steam Web API in batches of 100 ──────────────────
+// ── Steam API: batch fetch update times for all mods ─────────────────────────
 async function fetchSteamDetails(ids: string[]): Promise<SteamFileDetail[]> {
   const BATCH = 100;
   const results: SteamFileDetail[] = [];
@@ -65,106 +71,39 @@ async function fetchSteamDetails(ids: string[]): Promise<SteamFileDetail[]> {
   return results;
 }
 
-// ── Scrape the latest changelog entry for a single mod ────────────────────────
-// Only called for mods already confirmed as recently updated by the API,
-// so typically 0-2 requests per run — well under any rate limit.
+// ── Scrape changelog — only called for recently-updated mods (0-2 per run) ───
 async function fetchLatestChangelog(modId: string): Promise<string> {
   const url = `https://steamcommunity.com/sharedfiles/filedetails/changelog/${modId}`;
 
   try {
     const res = await fetch(url, {
       headers: {
-        // Identify as a regular browser to avoid bot detection
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9",
       },
     });
 
     if (!res.ok) {
-      console.warn(`  Changelog fetch failed for ${modId}: ${res.status}`);
+      console.warn(`Changelog fetch failed for ${modId}: ${res.status}`);
       return "Could not retrieve changelog.";
     }
 
-    const html = await res.text();
-    const $ = cheerio.load(html);
-
-    // First .detailBox.workshopAnnouncement block = latest changelog entry
-    const changelogBox = $(".detailBox.workshopAnnouncement").first();
-
-    if (!changelogBox.length) {
-      return "No changelog entries found.";
-    }
-
-    // Extract all <p> text within the entry, preserving line breaks
+    const $ = cheerio.load(await res.text());
     const lines: string[] = [];
-    changelogBox.find("p").each((_, el) => {
+
+    $(".detailBox.workshopAnnouncement").first().find("p").each((_, el) => {
       const text = $(el).text().trim();
       if (text) lines.push(text);
     });
 
-    const result = lines.join("\n").trim();
-    return result || "Changelog entry was empty.";
-
+    return lines.join("\n").trim() || "No changelog entries found.";
   } catch (err) {
-    console.warn(`  Changelog fetch error for ${modId}:`, err);
+    console.warn(`Changelog fetch error for ${modId}:`, err);
     return "Error retrieving changelog.";
   }
 }
 
-// ── Discord notification ──────────────────────────────────────────────────────
-async function sendDiscord(
-  modId: string,
-  modName: string,
-  updatedAt: Date,
-  ageHours: string,
-  changelog: string
-): Promise<void> {
-  if (!DISCORD_WEBHOOK_URL) { console.error("DISCORD_WEBHOOK_URL not set"); return; }
-
-  const MAX = 1024;
-  const chunks = changelog.trim().length === 0
-    ? ["No changelog available."]
-    : chunkText(changelog, MAX);
-
-  for (let i = 0; i < chunks.length; i++) {
-    const isFirst = i === 0;
-    const fields: object[] = [];
-
-    if (isFirst) {
-      fields.push(
-        { name: "Mod", value: `[${modName}](https://steamcommunity.com/sharedfiles/filedetails/?id=${modId})`, inline: false },
-        { name: "Updated", value: updatedAt.toUTCString(), inline: true },
-        { name: "Age", value: `${ageHours}h ago`, inline: true }
-      );
-    }
-
-    fields.push({
-      name: isFirst ? "Changelog" : "Changelog (continued)",
-      value: chunks[i],
-      inline: false,
-    });
-
-    const embed = {
-      title: isFirst ? "🔔 Arma 3 Mod Update" : `🔔 Arma 3 Mod Update (cont. ${i + 1})`,
-      color: 0xff0000,
-      timestamp: new Date().toISOString(),
-      footer: { text: "Steam Workshop Monitor" },
-      fields,
-    };
-
-    const res = await fetch(DISCORD_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: "Steam Workshop Monitor", content: "", embeds: [embed] }),
-    });
-
-    if (!res.ok) throw new Error(`Discord error: ${res.status} ${res.statusText}`);
-    if (i < chunks.length - 1) await sleep(1000);
-  }
-
-  console.log(`  ✓ Discord notified (${chunks.length} message(s))`);
-}
-
+// ── Discord ───────────────────────────────────────────────────────────────────
 function chunkText(text: string, max: number): string[] {
   const chunks: string[] = [];
   let current = "";
@@ -181,47 +120,98 @@ function chunkText(text: string, max: number): string[] {
   return chunks;
 }
 
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+async function sendDiscordNotification(
+  modId: string,
+  modName: string,
+  updatedAt: Date,
+  ageHours: string,
+  changelog: string
+): Promise<void> {
+  if (!DISCORD_WEBHOOK_URL) { console.error("DISCORD_WEBHOOK_URL not set"); return; }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
-async function main() {
-  if (!STEAM_API_KEY) { console.error("STEAM_API_KEY not set"); process.exit(1); }
+  const MAX_FIELD = 1024;
+  const chunks = changelog.trim().length === 0
+    ? ["No changelog available."]
+    : chunkText(changelog, MAX_FIELD);
 
-  const mods = loadMods();
-  console.log(`Loaded ${mods.length} mod(s)`);
+  for (let i = 0; i < chunks.length; i++) {
+    const isFirst = i === 0;
+    const fields: object[] = [];
 
-  const details = await fetchSteamDetails(mods.map(m => m.id));
-  const nameById = Object.fromEntries(mods.map(m => [m.id, m.name]));
+    if (isFirst) {
+      fields.push(
+        {
+          name: "Mod",
+          value: `[${modName}](https://steamcommunity.com/sharedfiles/filedetails/?id=${modId})`,
+          inline: false,
+        },
+        { name: "Updated", value: updatedAt.toUTCString(), inline: true },
+        { name: "Age",     value: `${ageHours}h ago`,      inline: true }
+      );
+    }
+
+    fields.push({
+      name: isFirst ? "Changelog" : "Changelog (continued)",
+      value: chunks[i],
+      inline: false,
+    });
+
+    const res = await fetch(DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "Steam Workshop Monitor",
+        content: "",
+        embeds: [{
+          title: isFirst ? "🔔 Arma 3 Mod Update" : `🔔 Arma 3 Mod Update (cont. ${i + 1})`,
+          color: 0xff0000,
+          timestamp: new Date().toISOString(),
+          footer: { text: "Steam Workshop Monitor" },
+          fields,
+        }],
+      }),
+    });
+
+    if (!res.ok) throw new Error(`Discord error: ${res.status} ${res.statusText}`);
+    if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 1000));
+  }
+
+  console.log(`  ✓ Discord notified (${chunks.length} message(s))`);
+}
+
+// ── Single test — Playwright harness, no browser launched ────────────────────
+test("Check all Arma 3 Workshop mods for recent updates", async () => {
+  if (!STEAM_API_KEY) throw new Error("STEAM_API_KEY environment variable not set");
+
+  console.log(`Checking ${workshopMods.length} mod(s) via Steam API...`);
+
+  const details = await fetchSteamDetails(workshopMods.map(m => m.id));
+  const nameById = Object.fromEntries(workshopMods.map(m => [m.id, m.name]));
 
   const now = Date.now();
   let recentCount = 0;
 
   for (const detail of details) {
     if (detail.result !== 1) {
-      console.warn(`  Skipping ${detail.publishedfileid}: result=${detail.result}`);
+      console.warn(`  Skipping ${detail.publishedfileid}: Steam result=${detail.result}`);
       continue;
     }
 
-    const updatedAt = new Date(detail.time_updated * 1000);
-    const ageHours = ((now - updatedAt.getTime()) / 3_600_000).toFixed(1);
-    const isRecent = parseFloat(ageHours) < HOURS_THRESHOLD;
+    const updatedAt  = new Date(detail.time_updated * 1000);
+    const ageHours   = ((now - updatedAt.getTime()) / 3_600_000).toFixed(1);
+    const isRecent   = parseFloat(ageHours) < HOURS_THRESHOLD;
     const displayName = nameById[detail.publishedfileid] ?? detail.title;
 
-    console.log(`[${detail.publishedfileid}] ${displayName} — ${ageHours}h ago ${isRecent ? "⚠ RECENT" : ""}`);
+    console.log(`[${detail.publishedfileid}] ${displayName} — ${ageHours}h ago${isRecent ? " ⚠ RECENT" : ""}`);
 
     if (isRecent) {
       recentCount++;
-      console.log(`  Fetching changelog for ${detail.publishedfileid}...`);
-
-      // Small courtesy delay before hitting the community page
-      await sleep(2000);
+      await new Promise(r => setTimeout(r, 2000)); // courtesy delay
       const changelog = await fetchLatestChangelog(detail.publishedfileid);
-
-      await sendDiscord(detail.publishedfileid, displayName, updatedAt, ageHours, changelog);
+      console.log(`  Changelog preview: ${changelog.slice(0, 80)}...`);
+      await sendDiscordNotification(detail.publishedfileid, displayName, updatedAt, ageHours, changelog);
     }
   }
 
-  console.log(`\nDone. ${recentCount} recent update(s) found.`);
-}
-
-main().catch(err => { console.error(err); process.exit(1); });
+  console.log(`\nComplete. ${recentCount} recent update(s) found.`);
+});

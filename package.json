@@ -3,9 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "scripts": {
-  "check-updates": "ts-node arma_checker.spec.ts"
-},
+  "scripts": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kevinortiz43/DiscordBot.git"
