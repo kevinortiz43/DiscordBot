@@ -1,70 +1,51 @@
 name: Playwright Tests
 
 on:
-  # Trigger on git push/PR to main/master
   push:
     branches: [main, master]
-
   schedule:
-    - cron: '0 1/12 * * *'  # 4 PM UTC daily
+    - cron: '0 1/12 * * *'
 
 jobs:
   test:
-    timeout-minutes: 100
+    timeout-minutes: 60
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      PLAYWRIGHT_BROWSERS_PATH: 0
-      # Increase npm timeout for slower connections
-      # TIMEOUT: 120000
+
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
-          node-version: 24 
+          node-version: 20
+          cache: 'npm'
 
       - name: Install Dependencies
         run: npm ci
 
-      - name: Install Playwright Browsers & Dependencies
-        run: |
-          set -e
-          echo "Installing Playwright dependencies..."
-          npx playwright install-deps
-          
-          echo "Installing Chromium browser with retry logic..."
-          MAX_RETRIES=5
-          BASE_DELAY=10
-          
-          for attempt in $(seq 1 $MAX_RETRIES); do
-            echo "Attempt $attempt of $MAX_RETRIES to install Chromium..."
-            
-            # Use timeout command to prevent hanging (30 minutes max per attempt)
-            if timeout 30m npx playwright install chromium --with-deps; then
-              echo "Chromium installed successfully on attempt $attempt!"
-              break
-            else
-              exit_code=$?
-              if [ $attempt -eq $MAX_RETRIES ]; then
-                echo "All $MAX_RETRIES attempts failed. Exiting with code $exit_code."
-                exit $exit_code
-              fi
-              
-              # Exponential backoff: 10s, 20s, 40s, 80s, 160s
-              delay=$((BASE_DELAY * 2 ** (attempt - 1)))
-              echo "Attempt $attempt failed. Waiting $delay seconds before retry..."
-              sleep $delay
-            fi
-          done
+      # Cache Playwright browsers by the Playwright version in package-lock
+      - name: Cache Playwright Browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
 
-      - name: Verify Chromium Installation
-        run: |
-          echo "Verifying Chromium installation..."
-          npx playwright list --verbose
+      - name: Install Playwright Browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      # Even on cache hit, system deps (libnss3, etc.) still need to be present
+      - name: Install Playwright System Dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Verify Playwright
+        run: npx playwright --version
 
       - name: Run Playwright Tests
         run: npx playwright test --workers=1
-        env: 
+        env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
